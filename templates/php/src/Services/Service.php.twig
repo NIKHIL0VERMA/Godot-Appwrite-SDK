@@ -45,7 +45,7 @@ class {{ service.name | caseUcfirst }} extends Service
 {% set deprecated_message = '' %}
     /**
 {% if method.description %}
-{{ method.description|comment1 }}
+{{ method.description | wrap(75, '     * ') }}
      *
 {% endif %}
 {% for parameter in method.parameters.all %}
@@ -68,10 +68,13 @@ class {{ service.name | caseUcfirst }} extends Service
     public function {{ method.name | caseCamel }}({{ method | methodParameters }}): {{ method | getReturn(spec) }}
     {
         $apiPath = str_replace(
-            [{% for parameter in method.parameters.path %}'{{ '{' }}{{ parameter.name | caseCamel }}{{ '}' }}'{% if not loop.last %}, {% endif %}{% endfor %}],
-            [{% for parameter in method.parameters.path %}${{ parameter.name | caseCamel | escapeKeyword }}{% if not loop.last %}, {% endif %}{% endfor %}],
+            [{% for parameter in method.parameters.path %}'{{ '{' }}{{ parameter.name }}{{ '}' }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+            [{% for parameter in method.parameters.path %}{% if parameter.source|default('') == 'security' %}$this->client->getConfig('{{ parameter.config | caseLower }}'){% else %}${{ parameter.name | caseCamel | escapeKeyword }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}],
             '{{ method.path }}'
         );
+        {%~ for security in method.securityQueries %}
+        $apiPath .= '{% if loop.first %}?{% else %}&{% endif %}{{ security.name }}=' . urlencode($this->client->getConfig('{{ security.name | caseLower }}'));
+        {%~ endfor %}
 
         {{~ include('php/base/params.twig') -}}
         {%~ if 'multipart/form-data' in method.consumes %}

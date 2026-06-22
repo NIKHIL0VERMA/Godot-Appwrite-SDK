@@ -95,7 +95,9 @@ class Client @JvmOverloads constructor(
      */
     fun set{{header.key | caseUcfirst}}(value: String): Client {
         config["{{ header.key | caseCamel }}"] = value
+        {%~ if header.global %}
         addHeader("{{ header.name | caseLower }}", value)
+        {%~ endif %}
         return this
     }
 
@@ -189,24 +191,35 @@ class Client @JvmOverloads constructor(
      */
     fun getHeaders(): Map<String, String> = headers.toMap()
 
+    {%~ for clientMethodName, clientMethods in spec.clientMethods %}
+    {%~ for clientMethod in clientMethods %}
     /**
-     * Sends a "ping" request to Appwrite to verify connectivity.
+     * {{ clientMethod.description | replace({'\n': '\n     * '}) | raw }}
      *
      * @return String
      */
-    suspend fun ping(): String {
-        val apiPath = "/ping"
+    suspend fun {{ clientMethodName | caseCamel }}(): String {
+        val apiPath = "{{ clientMethod.path }}"
         val apiParams = mutableMapOf<String, Any?>()
-        val apiHeaders = mutableMapOf("content-type" to "application/json")
+        val apiHeaders = mutableMapOf(
+            {%~ for key, security in clientMethod.securityHeaders %}
+            "{{ security.name }}" to config["{{ key | caseLower }}"].orEmpty(),
+            {%~ endfor %}
+            {%~ for key, header in clientMethod.headers %}
+            "{{ key }}" to "{{ header }}",
+            {%~ endfor %}
+        )
 
         return call(
-            "GET",
+            "{{ clientMethod.method | caseUpper }}",
             apiPath,
             apiHeaders,
             apiParams,
             responseType = String::class.java
         )
     }
+    {%~ endfor %}
+    {%~ endfor %}
 
     /**
      * Prepare the HTTP request

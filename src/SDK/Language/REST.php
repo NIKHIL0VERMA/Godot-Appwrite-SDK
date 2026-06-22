@@ -4,9 +4,6 @@ namespace Appwrite\SDK\Language;
 
 class REST extends HTTP
 {
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'REST';
@@ -27,15 +24,11 @@ class REST extends HTTP
         return '[' . $elements . ']';
     }
 
-    /**
-     * @param array $param
-     * @return string
-     */
     public function getParamDefault(array $param): string
     {
-        $type       = $param['type'] ?? '';
-        $default    = $param['default'] ?? '';
-        $required   = $param['required'] ?? '';
+        $type = $param['type'] ?? '';
+        $default = $param['default'] ?? '';
+        $required = $param['required'] ?? '';
 
         if ($required) {
             return '';
@@ -90,8 +83,8 @@ class REST extends HTTP
      */
     public function getParamExample(array $param, string $lang = '', array $spec = []): string
     {
-        $type       = $param['type'] ?? '';
-        $example    = $param['example'] ?? '';
+        $type = $param['type'] ?? '';
+        $example = $param['example'] ?? '';
 
         $hasExample = !empty($example) || $example === 0 || $example === false;
 
@@ -108,45 +101,42 @@ class REST extends HTTP
 
         return match ($type) {
             self::TYPE_ARRAY => (function () use ($example) {
-                // If array of strings, make sure any sub-strings are escaped
-                if (\substr($example, 1, 1) === '"') {
-                    $start = \substr($example, 0, 2);
-                    $end = \substr($example, -2);
-                    $contents = \substr($example, 2, -2);
-                    $contents = \addslashes($contents);
-                    return $start . $contents . $end;
-                } else {
-                    return $example;
-                }
-            })(),
+                    // If array of strings, make sure any sub-strings are escaped
+                    if (\substr((string) $example, 1, 1) === '"') {
+                        $start = \substr((string) $example, 0, 2);
+                        $end = \substr((string) $example, -2);
+                        $contents = \substr((string) $example, 2, -2);
+                        $contents = \addslashes($contents);
+                        return $start . $contents . $end;
+                    } else {
+                        return $example;
+                    }
+                })(),
             self::TYPE_FILE, self::TYPE_INTEGER, self::TYPE_NUMBER => $example,
             self::TYPE_BOOLEAN => ($example) ? 'true' : 'false',
             self::TYPE_OBJECT => ($example === '{}')
-                ? '{}'
-                : (($formatted = json_encode(json_decode($example, true), JSON_PRETTY_PRINT))
-                    ? (function () use ($formatted) {
+            ? '{}'
+            : (($formatted = json_encode(json_decode((string) $example, true), JSON_PRETTY_PRINT))
+                ? (function () use ($formatted): string|array|null{
                         // Replace leading four spaces with two spaces for indentation
                         $formatted = preg_replace('/^    /m', '  ', $formatted);
                         // Add two spaces before the closing brace if it's on a new line at the end
-                        $formatted = preg_replace('/\n(?=[^}]*}$)/', "\n  ", $formatted);
+                        $formatted = preg_replace('/\n(?=[^}]*}$)/', "\n  ", (string) $formatted);
                         return $formatted;
                     })()
-                    : $example),
+                : $example),
             self::TYPE_STRING => "\"{$example}\"",
         };
     }
 
-    /**
-     * @return array
-     */
     public function getFiles(): array
     {
         return [
-          [
-            'scope'         => 'method',
-            'destination'   => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
-            'template'      => '/rest/docs/example.md.twig',
-          ],
+            [
+                'scope' => 'method',
+                'destination' => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
+                'template' => '/rest/docs/example.md.twig',
+            ],
         ];
     }
 }

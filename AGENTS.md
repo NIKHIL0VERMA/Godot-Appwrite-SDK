@@ -47,7 +47,7 @@ The script strips Twig expressions before running `npm install`/`bun install`, t
 
 ## Repository at a Glance
 
-- **Purpose:** Generate Appwrite SDKs for ~16 languages from Swagger/OpenAPI specs using Twig templates
+- **Purpose:** Generate Appwrite SDKs and tooling targets for 20+ languages/platforms from Swagger/OpenAPI specs using Twig templates
 - **Language:** PHP (generator engine) + Twig (templates)
 - **Entry point:** `example.php` — runs generation for all or a specific SDK
 - **Output:** `examples/<lang>/` — checked-in generated SDK output for verification
@@ -59,7 +59,7 @@ examples/<lang>/              ← Generated SDK output (checked in for verificat
 example.php                   ← Entry point: regenerates all SDKs from specs
 ```
 
-**Supported SDKs:** PHP, Web, Node, CLI, Ruby, Python, Dart, Flutter, React Native, Go, Swift, Apple, DotNet, Android, Kotlin, GraphQL, Markdown, AgentSkills, CursorPlugin, ClaudePlugin, CodexPlugin
+**Supported SDKs:** PHP, Web, Node, CLI, Ruby, Python, Dart, Flutter, React Native, Go, Swift, Apple, DotNet, Android, Kotlin, Unity, REST, GraphQL, Rust, AgentSkills, CursorPlugin, ClaudePlugin, CodexPlugin
 
 ## Primary Workflows
 
@@ -68,11 +68,12 @@ example.php                   ← Entry point: regenerates all SDKs from specs
 1. Edit template(s) in `templates/<lang>/`
 2. Regenerate:
    ```bash
-   docker run --rm -v $(pwd):/app -w /app php:8.3-cli php example.php <lang>
+   php example.php <lang>
    ```
 3. Diff `examples/<lang>/` to verify the output is correct
-4. Run linter:
+4. Run linters and refactor check:
    ```bash
+   composer refactor:check
    composer lint-twig
    # or directly
    uvx djLint templates/ --lint
@@ -116,7 +117,7 @@ public function getFiles(): array
 3. Create `templates/newlang/` and add all Twig files
 4. Register all template files in `getFiles()`
 5. Add generation block to `example.php`
-6. Generate: `docker run --rm -v $(pwd):/app -w /app php:8.3-cli php example.php newlang`
+6. Generate: `php example.php newlang`
 7. Inspect `examples/newlang/`
 
 ## File Reference Map
@@ -127,7 +128,7 @@ public function getFiles(): array
 | Which files get generated | `src/SDK/Language/<Lang>.php` → `getFiles()` |
 | Type mappings for a language | `src/SDK/Language/<Lang>.php` → `getTypeName()` |
 | Available Twig filters | `src/SDK/SDK.php` (around line 62) |
-| How specs are parsed | `src/Spec/Swagger2.php` |
+| How specs are parsed | `src/Spec/OpenAPI3.php`, `src/Spec/Swagger2.php` |
 | Generation orchestration | `src/SDK/SDK.php` → `generate()` |
 | Example generation script | `example.php` |
 | Generated output for review | `examples/<lang>/` |
@@ -139,6 +140,7 @@ Pass as first argument to generate only that SDK:
 | Argument | Language class | Output dir |
 |----------|---------------|------------|
 | `php` | PHP | `examples/php/` |
+| `unity` | Unity | `examples/unity/` |
 | `web` | Web | `examples/web/` |
 | `node` | Node | `examples/node/` |
 | `cli` | CLI | `examples/cli/` |
@@ -151,10 +153,11 @@ Pass as first argument to generate only that SDK:
 | `swift` | Swift | `examples/swift/` |
 | `apple` | Apple | `examples/apple/` |
 | `dotnet` | DotNet | `examples/dotnet/` |
+| `rest` | REST | `examples/REST/` |
 | `android` | Android | `examples/android/` |
 | `kotlin` | Kotlin | `examples/kotlin/` |
 | `graphql` | GraphQL | `examples/graphql/` |
-| `markdown` | Markdown | `examples/markdown/` |
+| `rust` | Rust | `examples/rust/` |
 | `agent-skills` | AgentSkills | `examples/agent-skills/` |
 | `cursor-plugin` | CursorPlugin | `examples/cursor-plugin/` |
 | `claude-plugin` | ClaudePlugin | `examples/claude-plugin/` |
@@ -176,9 +179,14 @@ Pass as first argument to generate only that SDK:
 - **Silent no-op:** A new `.twig` file with no `getFiles()` entry — generation runs successfully but the file is never created
 - **Wrong scope:** Using `default` scope when you need `service` scope means your template can't access `{{ service.name }}`
 - **Copy scope surprises:** A `copy`-scoped file with Twig syntax — the syntax is output literally, not rendered
-- **Spec fetch failure:** `example.php` requires internet access to fetch the live spec from GitHub; generation fails with an exception if the fetch returns empty. Spec URL pattern:
+- **Spec fetch failure:** `example.php` requires internet access to fetch the live spec from GitHub; generation fails with an exception if the fetch returns empty. Spec URL pattern (prefix is `open-api3` or `swagger2` depending on the format):
   ```
-  https://raw.githubusercontent.com/appwrite/specs/main/specs/{version}/swagger2-{version}-{platform}.json
+  https://raw.githubusercontent.com/appwrite/specs/main/specs/{version}/open-api3-{version}-{platform}.json
+  ```
+- **Spec formats:** `example.php` parses OpenAPI 3 specs by default (`Appwrite\Spec\OpenAPI3`). Swagger 2 (`Appwrite\Spec\Swagger2`) is still fully supported; both formats produce identical SDKs. Pass the format as the third argument:
+  ```bash
+  php example.php <sdk> <platform> swagger2             # use Swagger 2 spec
+  SDK_GEN_SPEC_FILE=/path/to/spec.json php example.php  # use a local spec file
   ```
 - **Platform mismatch:** Pass the right platform (`console`, `client`, `server`) as second arg — different platforms expose different API services
 - **Child language gaps:** Adding a file to a parent's `getFiles()` but the child language needs a different template — child classes can override `getFiles()` to replace or remove entries
@@ -186,18 +194,23 @@ Pass as first argument to generate only that SDK:
 ## Installing Dependencies
 
 ```bash
-# With Composer installed locally
 composer update --ignore-platform-reqs --optimize-autoloader --no-plugins --no-scripts --prefer-dist
-
-# With Docker
-docker run --rm -it -v "$(pwd)":/app composer update --ignore-platform-reqs --optimize-autoloader --no-plugins --no-scripts --prefer-dist
 ```
 
 ## Running Tests
 
+Tests are split into two suites:
+
+- `tests/unit/` — fast, pure-PHP tests (spec parsers); no Docker needed
+- `tests/e2e/` — per-language SDK tests; generate an SDK from `tests/resources/spec-openapi3.json` into `tests/e2e/sdks/` and run it in Docker against a mock API. The mock server (`./mock-server`) is started in `setUp()` and removed in `tearDown()` (`docker compose down`); after interrupted runs, clean up with `cd mock-server && docker compose down`
+- `tests/resources/` — shared fixtures (spec file, upload files) used by both suites
+
 ```bash
-docker run --rm -v $(pwd):$(pwd):rw -w $(pwd) php:8.3-cli-alpine vendor/bin/phpunit
+vendor/bin/phpunit --testsuite Unit        # fast, run these always
+vendor/bin/phpunit tests/e2e/PHP83Test.php # one language e2e (needs Docker)
 ```
+
+If local PHP is missing, is not the required version, or has extension issues, use the matching PHP Docker image as a fallback for that command.
 
 ## Pre-Submit Checklist
 
@@ -207,5 +220,6 @@ Before submitting changes that touch templates or language classes:
 - [ ] Inspected `examples/<lang>/` output looks correct
 - [ ] Any new template files are listed in `getFiles()` of the language class
 - [ ] Any new language class is added to `example.php`
+- [ ] Rector check passes (`composer refactor:check`)
 - [ ] Twig linter passes (`composer lint-twig`)
 - [ ] If a parent language was modified, child SDKs were also checked

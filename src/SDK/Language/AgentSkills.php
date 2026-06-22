@@ -2,6 +2,7 @@
 
 namespace Appwrite\SDK\Language;
 
+use Override;
 use Appwrite\SDK\Language;
 use Twig\TwigFilter;
 
@@ -24,69 +25,41 @@ class AgentSkills extends Language
     protected string $skillDestination = 'skills/{{ spec.title | caseLower }}-%s/SKILL.md';
     protected bool $prefixSkillName = true;
 
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'AgentSkills';
     }
 
-    /**
-     * @return array
-     */
     public function getKeywords(): array
     {
         return [];
     }
 
-    /**
-     * @return array
-     */
     public function getIdentifierOverrides(): array
     {
         return [];
     }
 
-    /**
-     * @return string
-     */
     public function getStaticAccessOperator(): string
     {
         return '.';
     }
 
-    /**
-     * @return string
-     */
     public function getStringQuote(): string
     {
         return '"';
     }
 
-    /**
-     * @param string $elements
-     * @return string
-     */
     public function getArrayOf(string $elements): string
     {
         return '[' . $elements . ']';
     }
 
-    /**
-     * @param array $parameter
-     * @param array $spec
-     * @return string
-     */
     public function getTypeName(array $parameter, array $spec = []): string
     {
         return $parameter['type'] ?? 'string';
     }
 
-    /**
-     * @param array $param
-     * @return string
-     */
     public function getParamDefault(array $param): string
     {
         return $param['default'] ?? '';
@@ -103,15 +76,11 @@ class AgentSkills extends Language
         return $param['example'] ?? '';
     }
 
-    /**
-     * @return array
-     */
+    #[Override]
     public function getFilters(): array
     {
         return [
-            new TwigFilter('skillName', function (string $lang, array $spec): string {
-                return $this->getSkillName($lang, $spec['title'] ?? '');
-            }),
+            new TwigFilter('skillName', fn(string $lang, array $spec): string => $this->getSkillName($lang, $spec['title'] ?? '')),
         ];
     }
 
@@ -130,38 +99,35 @@ class AgentSkills extends Language
 
         foreach ($this->skillLanguages as $lang) {
             $files[] = [
-                'scope'       => 'default',
+                'scope' => 'default',
                 'destination' => \sprintf($this->skillDestination, $lang),
-                'template'    => 'agent-skills/' . $lang . '.md.twig',
+                'template' => 'agent-skills/' . $lang . '.md.twig',
             ];
         }
 
         return $files;
     }
 
-    /**
-     * @return array
-     */
     public function getFiles(): array
     {
         $files = $this->getSkillFiles();
 
         $files[] = [
-            'scope'       => 'default',
+            'scope' => 'default',
             'destination' => 'README.md',
-            'template'    => 'agent-skills/README.md.twig',
+            'template' => 'agent-skills/README.md.twig',
         ];
 
         $files[] = [
-            'scope'       => 'default',
+            'scope' => 'default',
             'destination' => 'CHANGELOG.md',
-            'template'    => 'agent-skills/CHANGELOG.md.twig',
+            'template' => 'agent-skills/CHANGELOG.md.twig',
         ];
 
         $files[] = [
-            'scope'       => 'default',
+            'scope' => 'default',
             'destination' => 'LICENSE',
-            'template'    => 'agent-skills/LICENSE.twig',
+            'template' => 'agent-skills/LICENSE.twig',
         ];
 
         return $files;

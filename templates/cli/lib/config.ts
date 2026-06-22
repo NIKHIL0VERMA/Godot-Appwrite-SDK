@@ -37,7 +37,7 @@ import type {
   Entity,
   GlobalConfigData,
 } from "./types.js";
-import { createSettingsObject } from "./utils.js";
+import { createSettingsObject, isCloudHostname } from "./utils.js";
 import {
   CONFIG_RESOURCE_KEYS,
   EXECUTABLE_NAME,
@@ -81,6 +81,7 @@ const KeyIndexes = getSchemaKeys(IndexSchema);
 const KeyIndexesColumns = getSchemaKeys(IndexTableSchema);
 
 const CONFIG_KEY_ORDER = [
+  "organizationId",
   "projectId",
   "projectName",
   "endpoint",
@@ -106,10 +107,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function normalizeCloudConsoleEndpoint(endpoint: string): string {
   try {
     const url = new URL(endpoint);
-    if (
-      url.hostname === "cloud.appwrite.io" ||
-      url.hostname.endsWith(".cloud.appwrite.io")
-    ) {
+    if (isCloudHostname(url.hostname)) {
       return "https://cloud.appwrite.io/v1";
     }
   } catch (_error) {
@@ -1156,6 +1154,7 @@ class Local extends Config<ConfigType> {
   }
 
   getProject(): {
+    organizationId?: string;
     projectId?: string;
     projectName?: string;
     projectSettings?: SettingsType;
@@ -1165,6 +1164,7 @@ class Local extends Config<ConfigType> {
     }
 
     return {
+      organizationId: this.get("organizationId"),
       projectId: this.get("projectId"),
       projectName: this.get("projectName"),
       projectSettings: this.get("settings"),
@@ -1188,6 +1188,10 @@ class Local extends Config<ConfigType> {
 
     this.set("settings", createSettingsObject(project));
   }
+
+  setOrganizationId(organizationId: string): void {
+    this.set("organizationId", organizationId);
+  }
 }
 
 class Global extends Config<GlobalConfigData> {
@@ -1202,6 +1206,10 @@ class Global extends Config<GlobalConfigData> {
   static PREFERENCE_KEY = "key" as const;
   static PREFERENCE_LOCALE = "locale" as const;
   static PREFERENCE_MODE = "mode" as const;
+  static PREFERENCE_ACCESS_TOKEN = "accessToken" as const;
+  static PREFERENCE_REFRESH_TOKEN = "refreshToken" as const;
+  static PREFERENCE_TOKEN_EXPIRY = "tokenExpiry" as const;
+  static PREFERENCE_CLIENT_ID = "clientId" as const;
 
   static IGNORE_ATTRIBUTES: readonly string[] = [
     Global.PREFERENCE_CURRENT,
@@ -1212,6 +1220,10 @@ class Global extends Config<GlobalConfigData> {
     Global.PREFERENCE_KEY,
     Global.PREFERENCE_LOCALE,
     Global.PREFERENCE_MODE,
+    Global.PREFERENCE_ACCESS_TOKEN,
+    Global.PREFERENCE_REFRESH_TOKEN,
+    Global.PREFERENCE_TOKEN_EXPIRY,
+    Global.PREFERENCE_CLIENT_ID,
   ];
 
   static MODE_ADMIN = "admin";
@@ -1353,6 +1365,50 @@ class Global extends Config<GlobalConfigData> {
 
   setKey(key: string): void {
     this.setTo(Global.PREFERENCE_KEY, key);
+  }
+
+  getAccessToken(): string {
+    if (!this.hasFrom(Global.PREFERENCE_ACCESS_TOKEN)) {
+      return "";
+    }
+    return this.getFrom(Global.PREFERENCE_ACCESS_TOKEN);
+  }
+
+  setAccessToken(accessToken: string): void {
+    this.setTo(Global.PREFERENCE_ACCESS_TOKEN, accessToken);
+  }
+
+  getRefreshToken(): string {
+    if (!this.hasFrom(Global.PREFERENCE_REFRESH_TOKEN)) {
+      return "";
+    }
+    return this.getFrom(Global.PREFERENCE_REFRESH_TOKEN);
+  }
+
+  setRefreshToken(refreshToken: string): void {
+    this.setTo(Global.PREFERENCE_REFRESH_TOKEN, refreshToken);
+  }
+
+  getTokenExpiry(): number {
+    if (!this.hasFrom(Global.PREFERENCE_TOKEN_EXPIRY)) {
+      return 0;
+    }
+    return this.getFrom(Global.PREFERENCE_TOKEN_EXPIRY);
+  }
+
+  setTokenExpiry(tokenExpiry: number): void {
+    this.setTo(Global.PREFERENCE_TOKEN_EXPIRY, tokenExpiry);
+  }
+
+  getClientId(): string {
+    if (!this.hasFrom(Global.PREFERENCE_CLIENT_ID)) {
+      return "";
+    }
+    return this.getFrom(Global.PREFERENCE_CLIENT_ID);
+  }
+
+  setClientId(clientId: string): void {
+    this.setTo(Global.PREFERENCE_CLIENT_ID, clientId);
   }
 
   hasFrom(key: string): boolean {

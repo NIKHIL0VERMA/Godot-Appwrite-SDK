@@ -67,10 +67,14 @@ class {{ service.name | caseUcfirst }}(client: Client) : Service(client) {
         onProgress: ((UploadProgress) -> Unit)? = null
         {%~ endif %}
     ){% if method.type != "webAuth" %}: {{ method | returnType(spec, sdk.namespace | caseDot) | raw }}{% endif %} {
-        val apiPath = "{{ method.path }}"
+        val apiPath = ("{{ method.path }}"
         {%~ for parameter in method.parameters.path %}
-            .replace("{{ '{' ~ parameter.name | caseCamel ~ '}' }}", {{ parameter.name | caseCamel }}{% if parameter.enumValues is not empty %}.value{% endif %})
+            .replace("{{ '{' ~ parameter.name ~ '}' }}", {% if parameter.source|default('') == 'security' %}client.config["{{ parameter.config | caseCamel }}"].orEmpty(){% else %}{{ parameter.name | caseCamel }}{% if parameter.enumValues is not empty %}.value{% endif %}{% endif %})
         {%~ endfor %}
+            {%~ for security in method.securityQueries %}
+            + "{% if loop.first %}?{% else %}&{% endif %}{{ security.name }}=${java.net.URLEncoder.encode(client.config.get("{{ security.name | caseCamel }}").orEmpty(), "UTF-8")}"
+            {%~ endfor %}
+        )
 
         val apiParams = mutableMapOf<String, Any?>(
         {%~ for parameter in method.parameters.query | merge(method.parameters.body) %}
@@ -140,6 +144,9 @@ class {{ service.name | caseUcfirst }}(client: Client) : Service(client) {
         )
         {%~ else %}
         val apiHeaders = mutableMapOf<String, String>(
+        {%~ for key, security in method.securityHeaders %}
+            "{{ security.name }}" to client.config["{{ key | caseCamel }}"].orEmpty(),
+        {%~ endfor %}
         {%~ for key, header in method.headers %}
             "{{ key }}" to "{{ header }}",
         {%~ endfor %}

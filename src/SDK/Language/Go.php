@@ -2,14 +2,12 @@
 
 namespace Appwrite\SDK\Language;
 
+use Override;
 use Appwrite\SDK\Language;
 use Twig\TwigFilter;
 
 class Go extends Language
 {
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'Go';
@@ -17,8 +15,6 @@ class Go extends Language
 
     /**
      * Get Language Keywords List
-     *
-     * @return array
      */
     public function getKeywords(): array
     {
@@ -59,156 +55,148 @@ class Go extends Language
         return '[' . $elements . ']';
     }
 
-    /**
-     * @return array
-     */
     public function getIdentifierOverrides(): array
     {
         return [];
     }
 
-    /**
-     * @return array
-     */
     public function getFiles(): array
     {
         return [
             [
-                'scope'         => 'default',
-                'destination'   => 'go.mod',
-                'template'      => 'go/go.mod.twig',
+                'scope' => 'default',
+                'destination' => 'go.mod',
+                'template' => 'go/go.mod.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'README.md',
-                'template'      => 'go/README.md.twig',
+                'scope' => 'default',
+                'destination' => 'README.md',
+                'template' => 'go/README.md.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'CHANGELOG.md',
-                'template'      => 'go/CHANGELOG.md.twig',
+                'scope' => 'default',
+                'destination' => 'CHANGELOG.md',
+                'template' => 'go/CHANGELOG.md.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'LICENSE',
-                'template'      => 'go/LICENSE.twig',
+                'scope' => 'default',
+                'destination' => 'LICENSE',
+                'template' => 'go/LICENSE.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'appwrite/appwrite.go',
-                'template'      => 'go/appwrite.go.twig',
+                'scope' => 'default',
+                'destination' => 'appwrite/appwrite.go',
+                'template' => 'go/appwrite.go.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'client/client.go',
-                'template'      => 'go/client.go.twig',
+                'scope' => 'default',
+                'destination' => 'client/client.go',
+                'template' => 'go/client.go.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'file/inputFile.go',
-                'template'      => 'go/inputFile.go.twig',
+                'scope' => 'default',
+                'destination' => 'file/inputFile.go',
+                'template' => 'go/inputFile.go.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'query/query.go',
-                'template'      => 'go/query.go.twig',
+                'scope' => 'default',
+                'destination' => 'query/query.go',
+                'template' => 'go/query.go.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'operator/operator.go',
-                'template'      => 'go/operator.go.twig',
+                'scope' => 'default',
+                'destination' => 'operator/operator.go',
+                'template' => 'go/operator.go.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'permission/permission.go',
-                'template'      => 'go/permission.go.twig',
+                'scope' => 'default',
+                'destination' => 'permission/permission.go',
+                'template' => 'go/permission.go.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'role/role.go',
-                'template'      => 'go/role.go.twig',
+                'scope' => 'default',
+                'destination' => 'role/role.go',
+                'template' => 'go/role.go.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'id/id.go',
-                'template'      => 'go/id.go.twig',
+                'scope' => 'default',
+                'destination' => 'id/id.go',
+                'template' => 'go/id.go.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'id/id_test.go',
-                'template'      => 'go/id_test.go.twig',
-            ],
-
-            [
-                'scope'         => 'default',
-                'destination'   => 'role/role_test.go',
-                'template'      => 'go/role_test.go.twig',
+                'scope' => 'default',
+                'destination' => 'id/id_test.go',
+                'template' => 'go/id_test.go.twig',
             ],
 
             [
-                'scope'         => 'default',
-                'destination'   => 'permission/permission_test.go',
-                'template'      => 'go/permission_test.go.twig',
+                'scope' => 'default',
+                'destination' => 'role/role_test.go',
+                'template' => 'go/role_test.go.twig',
             ],
 
             [
-                'scope'         => 'default',
-                'destination'   => 'query/query_test.go',
-                'template'      => 'go/query_test.go.twig',
+                'scope' => 'default',
+                'destination' => 'permission/permission_test.go',
+                'template' => 'go/permission_test.go.twig',
             ],
 
             [
-                'scope'         => 'default',
-                'destination'   => 'operator/operator_test.go',
-                'template'      => 'go/operator_test.go.twig',
+                'scope' => 'default',
+                'destination' => 'query/query_test.go',
+                'template' => 'go/query_test.go.twig',
+            ],
+
+            [
+                'scope' => 'default',
+                'destination' => 'operator/operator_test.go',
+                'template' => 'go/operator_test.go.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'client/client_test.go',
-                'template'      => 'go/client_test.go.twig',
+                'scope' => 'default',
+                'destination' => 'client/client_test.go',
+                'template' => 'go/client_test.go.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'models/model_interface.go',
-                'template'      => 'go/models/model_interface.go.twig',
+                'scope' => 'default',
+                'destination' => 'models/model_interface.go',
+                'template' => 'go/models/model_interface.go.twig',
             ],
             [
-                'scope'         => 'service',
-                'destination'   => '{{ service.name | caseLower}}/{{service.name | caseSnake}}.go',
-                'template'      => 'go/services/service.go.twig',
+                'scope' => 'service',
+                'destination' => '{{ service.name | caseLower}}/{{service.name | caseSnake}}.go',
+                'template' => 'go/services/service.go.twig',
             ],
             [
-                'scope'         => 'service',
-                'destination'   => '{{ service.name | caseLower}}/{{service.name | caseSnake}}_test.go',
-                'template'      => 'go/services/service_test.go.twig',
+                'scope' => 'service',
+                'destination' => '{{ service.name | caseLower}}/{{service.name | caseSnake}}_test.go',
+                'template' => 'go/services/service_test.go.twig',
             ],
             [
-                'scope'         => 'method',
-                'destination'   => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
-                'template'      => 'go/docs/example.md.twig',
+                'scope' => 'method',
+                'destination' => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
+                'template' => 'go/docs/example.md.twig',
             ],
             [
-                'scope'         => 'definition',
-                'destination'   => 'models/{{ definition.name | caseCamel }}.go',
-                'template'      => 'go/models/model.go.twig',
+                'scope' => 'definition',
+                'destination' => 'models/{{ definition.name | caseCamel }}.go',
+                'template' => 'go/models/model.go.twig',
             ],
             [
-                'scope'         => 'definition',
-                'destination'   => 'models/{{ definition.name | caseCamel }}_test.go',
-                'template'      => 'go/models/model_test.go.twig',
+                'scope' => 'definition',
+                'destination' => 'models/{{ definition.name | caseCamel }}_test.go',
+                'template' => 'go/models/model_test.go.twig',
             ],
             [
-                'scope'         => 'requestModel',
-                'destination'   => 'models/{{ requestModel.name | caseCamel }}.go',
-                'template'      => 'go/models/request_model.go.twig',
+                'scope' => 'requestModel',
+                'destination' => 'models/{{ requestModel.name | caseCamel }}.go',
+                'template' => 'go/models/request_model.go.twig',
             ],
         ];
     }
 
     /**
-     * @param array $parameter
      * @param array $nestedTypes
-     * @return string
      */
     public function getTypeName(array $parameter, array $spec = []): string
     {
@@ -240,15 +228,11 @@ class Go extends Language
         };
     }
 
-    /**
-     * @param array $param
-     * @return string
-     */
     public function getParamDefault(array $param): string
     {
-        $type       = $param['type'] ?? '';
-        $default    = $param['default'] ?? '';
-        $required   = $param['required'] ?? '';
+        $type = $param['type'] ?? '';
+        $default = $param['default'] ?? '';
+        $required = $param['required'] ?? '';
 
         if ($required) {
             return '';
@@ -305,8 +289,8 @@ class Go extends Language
      */
     public function getParamExample(array $param, string $lang = '', array $spec = []): string
     {
-        $type       = $param['type'] ?? '';
-        $example    = $param['example'] ?? '';
+        $type = $param['type'] ?? '';
+        $example = $param['example'] ?? '';
 
         $output = '';
 
@@ -326,7 +310,7 @@ class Go extends Language
                     $output .= 'map[string]interface{}{}';
                     break;
                 case self::TYPE_ARRAY:
-                    $output .= '[]interface{}{}';
+                    $output .= $this->getTypeName($param) . '{}';
                     break;
                 case self::TYPE_FILE:
                     $output .= 'file.NewInputFile("/path/to/file.png", "file.png")';
@@ -339,20 +323,20 @@ class Go extends Language
                     $output .= $example;
                     break;
                 case self::TYPE_ARRAY:
-                    if (\str_starts_with($example, '[')) {
-                        $example = \substr($example, 1);
+                    if (\str_starts_with((string) $example, '[')) {
+                        $example = \substr((string) $example, 1);
                     }
-                    if (\str_ends_with($example, ']')) {
-                        $example = \substr($example, 0, -1);
+                    if (\str_ends_with((string) $example, ']')) {
+                        $example = \substr((string) $example, 0, -1);
                     }
-                    $output .= 'interface{}{' . $example . '}';
+                    $output .= $this->getTypeName($param) . '{' . $example . '}';
                     break;
                 case self::TYPE_OBJECT:
                     $output .= ($example === '{}')
-                    ? 'map[string]interface{}{}'
-                    : (($formatted = json_encode(json_decode($example, true), JSON_PRETTY_PRINT))
-                        ? 'map[string]interface{}' . preg_replace('/\n/', "\n    ", $formatted)
-                        : 'map[string]interface{}' . $example);
+                        ? 'map[string]interface{}{}'
+                        : (($formatted = json_encode(json_decode((string) $example, true), JSON_PRETTY_PRINT))
+                            ? 'map[string]interface{}' . preg_replace('/\n/', "\n    ", $formatted)
+                            : 'map[string]interface{}' . $example);
                     break;
                 case self::TYPE_BOOLEAN:
                     $output .= ($example) ? 'true' : 'false';
@@ -369,10 +353,11 @@ class Go extends Language
         return $output;
     }
 
+    #[Override]
     public function getFilters(): array
     {
         return [
-            new TwigFilter('godocComment', function ($value, $indent = 0) {
+            new TwigFilter('godocComment', function ($value, $indent = 0): string {
                 $value = trim($value);
                 $value = explode("\n", $value);
                 $indent = \str_repeat(' ', $indent);
@@ -381,18 +366,10 @@ class Go extends Language
                 }
                 return implode("\n" . $indent, $value);
             }, ['is_safe' => ['html']]),
-            new TwigFilter('propertyType', function (array $property, array $spec, string $generic = 'map[string]interface{}') {
-                return $this->getPropertyType($property, $spec, $generic);
-            }),
-            new TwigFilter('returnType', function (array $method, array $spec, string $namespace, string $generic = 'map[string]interface{}') {
-                return $this->getReturnType($method, $spec, $namespace, $generic);
-            }),
-            new TwigFilter('caseEnumKey', function (string $value) {
-                return $this->toUpperSnakeCase($value);
-            }),
-            new TwigFilter('goPackagePath', function (array $sdk) {
-                return $this->getPackagePath($sdk);
-            }),
+            new TwigFilter('propertyType', fn(array $property, array $spec, string $generic = 'map[string]interface{}'): string => $this->getPropertyType($property, $spec, $generic)),
+            new TwigFilter('returnType', fn(array $method, array $spec, string $namespace, string $generic = 'map[string]interface{}'): string => $this->getReturnType($method, $spec, $namespace, $generic)),
+            new TwigFilter('caseEnumKey', fn(string $value): string => $this->toUpperSnakeCase($value)),
+            new TwigFilter('goPackagePath', fn(array $sdk): string => $this->getPackagePath($sdk)),
         ];
     }
 
@@ -460,7 +437,7 @@ class Go extends Language
             return 'interface{}';
         }
 
-        $ret = ucfirst($method['responseModel']);
+        $ret = ucfirst((string) $method['responseModel']);
 
         return 'models.' . $ret;
     }

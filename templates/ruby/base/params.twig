@@ -1,7 +1,10 @@
             api_path = '{{ method.path }}'
 {% for parameter in method.parameters.path %}
-                .gsub('{{ '{' }}{{ parameter.name }}{{ '}' }}', {{ parameter.name | caseSnake | escapeKeyword }})
+                .gsub('{{ '{' }}{{ parameter.name }}{{ '}' }}', {% if parameter.source|default('') == 'security' %}@client.get_config('{{ parameter.config | caseLower }}'){% else %}{{ parameter.name | caseSnake | escapeKeyword }}{% endif %})
 {% endfor %}
+            {%~ for security in method.securityQueries %}
+            api_path += '{% if loop.first %}?{% else %}&{% endif %}{{ security.name }}=' + URI.encode_www_form_component(@client.get_config('{{ security.name | caseLower }}'))
+            {%~ endfor %}
 
 {% for parameter in method.parameters.all %}
 {% if parameter.required %}
@@ -18,6 +21,9 @@
             }
             
             api_headers = {
+            {%~ for key, security in method.securityHeaders %}
+                "{{ security.name }}": @client.get_config('{{ key | caseLower }}'),
+            {%~ endfor %}
 {% for parameter in method.parameters.header %}
                 "{{ parameter.name }}": {{ parameter.name | caseCamel | escapeKeyword }},
 {% endfor %}

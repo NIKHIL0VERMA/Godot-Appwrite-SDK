@@ -2,13 +2,11 @@
 
 namespace Appwrite\SDK\Language;
 
+use Override;
 use Twig\TwigFilter;
 
 class Web extends JS
 {
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'Web';
@@ -29,141 +27,138 @@ class Web extends JS
         return '[' . $elements . ']';
     }
 
-    /**
-     * @return array
-     */
     public function getFiles(): array
     {
         return [
             [
-                'scope'         => 'default',
-                'destination'   => 'src/index.ts',
-                'template'      => 'web/src/index.ts.twig',
+                'scope' => 'default',
+                'destination' => 'src/index.ts',
+                'template' => 'web/src/index.ts.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'src/client.ts',
-                'template'      => 'web/src/client.ts.twig',
+                'scope' => 'default',
+                'destination' => 'src/client.ts',
+                'template' => 'web/src/client.ts.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'src/service.ts',
-                'template'      => 'web/src/service.ts.twig',
+                'scope' => 'default',
+                'destination' => 'src/service.ts',
+                'template' => 'web/src/service.ts.twig',
             ],
             [
-                'scope'         => 'service',
-                'destination'   => 'src/services/{{service.name | caseKebab}}.ts',
-                'template'      => 'web/src/services/template.ts.twig',
+                'scope' => 'service',
+                'destination' => 'src/services/{{service.name | caseKebab}}.ts',
+                'template' => 'web/src/services/template.ts.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'src/services/realtime.ts',
-                'template'      => 'web/src/services/realtime.ts.twig',
+                'scope' => 'default',
+                'destination' => 'src/services/realtime.ts',
+                'template' => 'web/src/services/realtime.ts.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'src/models.ts',
-                'template'      => 'web/src/models.ts.twig',
+                'scope' => 'default',
+                'destination' => 'src/models.ts',
+                'template' => 'web/src/models.ts.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'src/permission.ts',
-                'template'      => 'web/src/permission.ts.twig',
+                'scope' => 'default',
+                'destination' => 'src/permission.ts',
+                'template' => 'web/src/permission.ts.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'src/role.ts',
-                'template'      => 'web/src/role.ts.twig',
+                'scope' => 'default',
+                'destination' => 'src/role.ts',
+                'template' => 'web/src/role.ts.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'src/id.ts',
-                'template'      => 'web/src/id.ts.twig',
+                'scope' => 'default',
+                'destination' => 'src/id.ts',
+                'template' => 'web/src/id.ts.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'src/channel.ts',
-                'template'      => 'web/src/channel.ts.twig',
+                'scope' => 'default',
+                'destination' => 'src/channel.ts',
+                'template' => 'web/src/channel.ts.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'src/query.ts',
-                'template'      => 'web/src/query.ts.twig',
+                'scope' => 'default',
+                'destination' => 'src/query.ts',
+                'template' => 'web/src/query.ts.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'src/operator.ts',
-                'template'      => 'web/src/operator.ts.twig',
+                'scope' => 'default',
+                'destination' => 'src/operator.ts',
+                'template' => 'web/src/operator.ts.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'README.md',
-                'template'      => 'web/README.md.twig',
+                'scope' => 'default',
+                'destination' => 'README.md',
+                'template' => 'web/README.md.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'CHANGELOG.md',
-                'template'      => 'web/CHANGELOG.md.twig',
+                'scope' => 'default',
+                'destination' => 'CHANGELOG.md',
+                'template' => 'web/CHANGELOG.md.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'LICENSE',
-                'template'      => 'web/LICENSE.twig',
+                'scope' => 'default',
+                'destination' => 'LICENSE',
+                'template' => 'web/LICENSE.twig',
             ],
             [
-            'scope'         => 'default',
-            'destination'   => 'package.json',
-            'template'      => 'web/package.json.twig',
+                'scope' => 'default',
+                'destination' => 'package.json',
+                'template' => 'web/package.json.twig',
             ],
             [
-                'scope'         => 'method',
-                'destination'   => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
-                'template'      => 'web/docs/example.md.twig',
+                'scope' => 'method',
+                'destination' => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
+                'template' => 'web/docs/example.md.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'tsconfig.json',
-                'template'      => '/web/tsconfig.json.twig',
+                'scope' => 'default',
+                'destination' => 'tsconfig.json',
+                'template' => '/web/tsconfig.json.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'rollup.config.mjs',
-                'template'      => '/web/rollup.config.mjs.twig',
+                'scope' => 'default',
+                'destination' => 'rollup.config.mjs',
+                'template' => '/web/rollup.config.mjs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'dist/cjs/package.json',
-                'template'      => '/web/dist/cjs/package.json.twig',
+                'scope' => 'default',
+                'destination' => 'dist/cjs/package.json',
+                'template' => '/web/dist/cjs/package.json.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'dist/esm/package.json',
-                'template'      => '/web/dist/esm/package.json.twig',
+                'scope' => 'default',
+                'destination' => 'dist/esm/package.json',
+                'template' => '/web/dist/esm/package.json.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '.github/workflows/publish.yml',
-                'template'      => 'web/.github/workflows/publish.yml.twig',
+                'scope' => 'default',
+                'destination' => '.github/workflows/publish.yml',
+                'template' => 'web/.github/workflows/publish.yml.twig',
             ],
             [
-                'scope'         => 'enum',
-                'destination'   => 'src/enums/{{ enum.name | caseKebab }}.ts',
-                'template'      => 'web/src/enums/enum.ts.twig',
+                'scope' => 'enum',
+                'destination' => 'src/enums/{{ enum.name | caseKebab }}.ts',
+                'template' => 'web/src/enums/enum.ts.twig',
             ],
             [
-                'scope'         => 'copy',
-                'destination'   => '.gitignore',
-                'template'      => 'web/.gitignore',
+                'scope' => 'copy',
+                'destination' => '.gitignore',
+                'template' => 'web/.gitignore',
             ],
             [
-                'scope'         => 'copy',
-                'destination'   => '.npmrc',
-                'template'      => 'web/.npmrc',
+                'scope' => 'copy',
+                'destination' => '.npmrc',
+                'template' => 'web/.npmrc',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'package-lock.json',
-                'template'      => 'web/package-lock.json.twig',
+                'scope' => 'default',
+                'destination' => 'package-lock.json',
+                'template' => 'web/package-lock.json.twig',
             ],
         ];
     }
@@ -176,8 +171,8 @@ class Web extends JS
      */
     public function getParamExample(array $param, string $lang = '', array $spec = []): string
     {
-        $type       = $param['type'] ?? '';
-        $example    = $param['example'] ?? '';
+        $type = $param['type'] ?? '';
+        $example = $param['example'] ?? '';
 
         $hasExample = !empty($example) || $example === 0 || $example === false;
 
@@ -198,7 +193,7 @@ class Web extends JS
             self::TYPE_BOOLEAN => ($example) ? 'true' : 'false',
             self::TYPE_OBJECT => ($example === '{}')
             ? '{}'
-            : (($formatted = json_encode(json_decode($example, true), JSON_PRETTY_PRINT))
+            : (($formatted = json_encode(json_decode((string) $example, true), JSON_PRETTY_PRINT))
                 ? preg_replace('/\n/', "\n    ", $formatted)
                 : $example),
             self::TYPE_STRING => "'{$example}'",
@@ -225,6 +220,7 @@ class Web extends JS
         return $properties;
     }
 
+    #[Override]
     public function getTypeName(array $parameter, array $method = []): string
     {
         if (
@@ -233,7 +229,7 @@ class Web extends JS
         ) {
             $enumType = isset($parameter['enumName'])
                 ? \ucfirst($parameter['enumName'])
-                : \ucfirst($parameter['name']);
+                : \ucfirst((string) $parameter['name']);
 
             return $enumType . '[]';
         }
@@ -242,7 +238,7 @@ class Web extends JS
             return \ucfirst($parameter['enumName']);
         }
         if (!empty($parameter['enumValues'])) {
-            return \ucfirst($parameter['name']);
+            return \ucfirst((string) $parameter['name']);
         }
         if (!empty($parameter['array']['model'])) {
             return 'Models.' . $this->toPascalCase($parameter['array']['model']) . '[]';
@@ -275,7 +271,7 @@ class Web extends JS
                             $unionTypes[] = 'Models.' . $this->toPascalCase($modelName);
                         }
                     }
-                    if (!empty($unionTypes)) {
+                    if ($unionTypes !== []) {
                         return '(' . implode(' | ', $unionTypes) . ')[]';
                     }
                 }
@@ -286,7 +282,7 @@ class Web extends JS
             case self::TYPE_FILE:
                 return 'File';
             case self::TYPE_OBJECT:
-                if (empty($method)) {
+                if ($method === []) {
                     return $parameter['type'];
                 }
                 switch ($method['responseModel']) {
@@ -341,12 +337,12 @@ class Web extends JS
             $this->populateGenerics($model, $spec, $generics, $skipFirst);
         }
 
-        if (empty($generics)) {
+        if ($generics === []) {
             return '';
         }
 
         $generics = array_unique($generics);
-        $generics = array_map(fn ($type) => "{$type} extends Models.{$type} = Models.Default{$type}", $generics);
+        $generics = array_map(fn($type): string => "{$type} extends Models.{$type} = Models.Default{$type}", $generics);
 
         return '<' . implode(', ', $generics) . '>';
     }
@@ -371,7 +367,7 @@ class Web extends JS
             $modelType = '';
 
             if (
-                array_key_exists($model, $spec['definitions']) &&
+                array_key_exists((string) $model, $spec['definitions']) &&
                 array_key_exists('additionalProperties', $spec['definitions'][$model]) &&
                 !$spec['definitions'][$model]['additionalProperties']
             ) {
@@ -383,16 +379,16 @@ class Web extends JS
             $models = [];
             $this->populateGenerics($model, $spec, $models);
             $models = array_unique($models);
-            $models = array_filter($models, fn ($m) => $m != $this->toPascalCase($model));
+            $models = array_filter($models, fn($m): bool => $m != $this->toPascalCase($model));
 
-            if (!empty($models)) {
+            if ($models !== []) {
                 $modelType .= '<' . implode(', ', $models) . '>';
             }
 
             $unionTypes[] = $modelType;
         }
 
-        if (empty($unionTypes)) {
+        if ($unionTypes === []) {
             return null;
         }
 
@@ -419,7 +415,7 @@ class Web extends JS
             $ret = 'Promise<';
 
             if (
-                array_key_exists($method['responseModel'], $spec['definitions']) &&
+                array_key_exists((string) $method['responseModel'], $spec['definitions']) &&
                 array_key_exists('additionalProperties', $spec['definitions'][$method['responseModel']]) &&
                 !$spec['definitions'][$method['responseModel']]['additionalProperties']
             ) {
@@ -433,15 +429,13 @@ class Web extends JS
             $this->populateGenerics($method['responseModel'], $spec, $models);
 
             $models = array_unique($models);
-            $models = array_filter($models, fn ($model) => $model != $this->toPascalCase($method['responseModel']));
+            $models = array_filter($models, fn($model): bool => $model != $this->toPascalCase($method['responseModel']));
 
-            if (!empty($models)) {
+            if ($models !== []) {
                 $ret .= '<' . implode(', ', $models) . '>';
             }
 
-            $ret .= '>';
-
-            return $ret;
+            return $ret . '>';
         }
 
         return 'Promise<{}>';
@@ -458,10 +452,10 @@ class Web extends JS
             $generics = [];
             $this->populateGenerics($property['sub_schema'], $spec, $generics);
 
-            $generics = array_filter($generics, fn ($model) => $model != $this->toPascalCase($property['sub_schema']));
+            $generics = array_filter($generics, fn($model): bool => $model != $this->toPascalCase($property['sub_schema']));
 
             $ret .= $this->toPascalCase($property['sub_schema']);
-            if (!empty($generics)) {
+            if ($generics !== []) {
                 $ret .= '<' . implode(', ', $generics) . '>';
             }
             if ($property['type'] === 'array') {
@@ -482,25 +476,16 @@ class Web extends JS
         return $this->getTypeName($property);
     }
 
+    #[Override]
     public function getFilters(): array
     {
         return \array_merge(parent::getFilters(), [
-            new TwigFilter('getPropertyType', function ($value, $method = []) {
-                return $this->getTypeName($value, $method);
-            }),
-            new TwigFilter('getReadOnlyProperties', function ($value, $responseModel, $spec = []) {
-                return $this->getReadOnlyProperties($value, $responseModel, $spec);
-            }),
-            new TwigFilter('getSubSchema', function (array $property, array $spec, string $methodName = '') {
-                return $this->getSubSchema($property, $spec, $methodName);
-            }),
-            new TwigFilter('getGenerics', function (string $model, array $spec, bool $skipAdditional = false) {
-                return $this->getGenerics($model, $spec, $skipAdditional);
-            }),
-            new TwigFilter('getReturn', function (array $method, array $spec) {
-                return $this->getReturn($method, $spec);
-            }),
-            new TwigFilter('getOverloadCondition', function (array $method) {
+            new TwigFilter('getPropertyType', fn(array $value, array $method = []): string => $this->getTypeName($value, $method)),
+            new TwigFilter('getReadOnlyProperties', fn(array $value, string $responseModel, array $spec = []): array => $this->getReadOnlyProperties($value, $responseModel, $spec)),
+            new TwigFilter('getSubSchema', fn(array $property, array $spec, string $methodName = ''): string => $this->getSubSchema($property, $spec, $methodName)),
+            new TwigFilter('getGenerics', fn(string $model, array $spec, bool $skipAdditional = false): string => $this->getGenerics($model, $spec, $skipAdditional)),
+            new TwigFilter('getReturn', fn(array $method, array $spec): string => $this->getReturn($method, $spec)),
+            new TwigFilter('getOverloadCondition', function (array $method): string {
                 $params = $method['parameters']['all'] ?? [];
 
                 $hasRequired = false;
@@ -538,23 +523,7 @@ class Web extends JS
                     $condition .= ' && (' . implode(' || ', $keys) . ')';
                 }
 
-                $condition .= ')';
-
-                return $condition;
-            }, ['is_safe' => ['html']]),
-            new TwigFilter('comment2', function ($value) {
-                $value = explode("\n", $value);
-                foreach ($value as $key => $line) {
-                    $value[$key] = "     * " . wordwrap($line, 75, "\n     * ");
-                }
-                return implode("\n", $value);
-            }, ['is_safe' => ['html']]),
-            new TwigFilter('comment3', function ($value) {
-                $value = explode("\n", $value);
-                foreach ($value as $key => $line) {
-                    $value[$key] = "         * " . wordwrap($line, 75, "\n         * ");
-                }
-                return implode("\n", $value);
+                return $condition . ')';
             }, ['is_safe' => ['html']]),
         ]);
     }

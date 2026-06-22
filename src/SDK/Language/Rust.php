@@ -2,17 +2,18 @@
 
 namespace Appwrite\SDK\Language;
 
+use Override;
 use Appwrite\SDK\Language;
 use Twig\TwigFilter;
 
 class Rust extends Language
 {
+    #[Override]
     protected $params = [
         "cratePackage" => "packageName",
     ];
 
     /**
-     * @param string $name
      * @return $this
      */
     public function setCratePackage(string $name): self
@@ -22,9 +23,6 @@ class Rust extends Language
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return "Rust";
@@ -32,8 +30,6 @@ class Rust extends Language
 
     /**
      * Get Language Keywords List
-     *
-     * @return array
      */
     public function getKeywords(): array
     {
@@ -94,9 +90,6 @@ class Rust extends Language
         ];
     }
 
-    /**
-     * @return array
-     */
     public function getIdentifierOverrides(): array
     {
         return [
@@ -136,9 +129,6 @@ class Rust extends Language
         ];
     }
 
-    /**
-     * @return array
-     */
     public function getFiles(): array
     {
         return [
@@ -276,11 +266,6 @@ class Rust extends Language
         ];
     }
 
-    /**
-     * @param array $parameter
-     * @param array $spec
-     * @return string
-     */
     public function getTypeName(array $parameter, array $spec = []): string
     {
         $isArray = (($parameter["type"] ?? null) === self::TYPE_ARRAY);
@@ -320,45 +305,31 @@ class Rust extends Language
             self::TYPE_BOOLEAN => "bool",
             self::TYPE_OBJECT => "serde_json::Value",
             self::TYPE_ARRAY => isset($parameter["array"]["model"])
-                ? "Vec<crate::models::" . ucfirst($parameter["array"]["model"]) . ">"
-                : (!empty(($parameter["array"] ?? [])["type"]) && !\is_array($parameter["array"]["type"])
-                    ? "Vec<" . $this->getTypeName($parameter["array"]) . ">"
-                    : "Vec<String>"),
+            ? "Vec<crate::models::" . ucfirst($parameter["array"]["model"]) . ">"
+            : (!empty(($parameter["array"] ?? [])["type"]) && !\is_array($parameter["array"]["type"])
+                ? "Vec<" . $this->getTypeName($parameter["array"]) . ">"
+                : "Vec<String>"),
             default => isset($parameter["model"])
-                ? "crate::models::" . ucfirst($parameter["model"])
-                : $parameter["type"],
+            ? "crate::models::" . ucfirst($parameter["model"])
+            : $parameter["type"],
         };
     }
 
-    /**
-     * @return string
-     */
     public function getStaticAccessOperator(): string
     {
         return '::';
     }
 
-    /**
-     * @return string
-     */
     public function getStringQuote(): string
     {
         return '"';
     }
 
-    /**
-     * @param string $elements
-     * @return string
-     */
     public function getArrayOf(string $elements): string
     {
         return 'vec![' . $elements . ']';
     }
 
-    /**
-     * @param array $param
-     * @return string
-     */
     public function getParamDefault(array $param): string
     {
         $type = $param["type"] ?? "";
@@ -403,7 +374,7 @@ class Rust extends Language
                     $output .= $default ? "true" : "false";
                     break;
                 case self::TYPE_STRING:
-                    $output .= "String::from(\"" . addslashes($default) . "\")";
+                    $output .= "String::from(\"" . addslashes((string) $default) . "\")";
                     break;
                 case self::TYPE_OBJECT:
                     $output .= "serde_json::Value::Null";
@@ -465,7 +436,7 @@ class Rust extends Language
                     $output .= $example ? "true" : "false";
                     break;
                 case self::TYPE_STRING:
-                    $output .= "\"" . addslashes($example) . "\"";
+                    $output .= "\"" . addslashes((string) $example) . "\"";
                     break;
                 case self::TYPE_OBJECT:
                     $output .= "serde_json::json!({})";
@@ -482,7 +453,7 @@ class Rust extends Language
 
                         if (\is_array($decoded)) {
                             $formatted = array_map(
-                                fn ($value) => $this->formatArrayItemExample($value, $items),
+                                fn($value): string => $this->formatArrayItemExample($value, $items),
                                 $decoded,
                             );
 
@@ -490,14 +461,14 @@ class Rust extends Language
                         }
                     } elseif (\is_array($example)) {
                         $formatted = array_map(
-                            fn ($value) => $this->formatArrayItemExample($value, $items),
+                            fn($value): string => $this->formatArrayItemExample($value, $items),
                             $example,
                         );
 
                         return "vec![" . implode(", ", $formatted) . "]";
                     }
 
-                    if (preg_match('/^\[(.*)]$/s', $example, $match)) {
+                    if (preg_match('/^\[(.*)]$/s', (string) $example, $match)) {
                         $example = $match[1];
                     }
                     $output .= "vec![" . $example . "]";
@@ -511,6 +482,7 @@ class Rust extends Language
         return $output;
     }
 
+    #[Override]
     public function getPermissionExample(string $example): string
     {
         $permissions = [];
@@ -529,10 +501,10 @@ class Rust extends Language
                 "any" => "Role::any()",
                 "guests" => "Role::guests()",
                 "users" => "Role::users(" . ($innerRole !== null ? 'Some("' . addslashes($innerRole) . '")' : "None") . ")",
-                "user" => 'Role::user("' . addslashes((string)$roleId) . '", ' . ($innerRole !== null ? 'Some("' . addslashes($innerRole) . '")' : "None") . ")",
-                "team" => 'Role::team("' . addslashes((string)$roleId) . '", ' . ($innerRole !== null ? 'Some("' . addslashes($innerRole) . '")' : "None") . ")",
-                "member" => 'Role::member("' . addslashes((string)$roleId) . '")',
-                "label" => 'Role::label("' . addslashes((string)$roleId) . '")',
+                "user" => 'Role::user("' . addslashes((string) $roleId) . '", ' . ($innerRole !== null ? 'Some("' . addslashes($innerRole) . '")' : "None") . ")",
+                "team" => 'Role::team("' . addslashes((string) $roleId) . '", ' . ($innerRole !== null ? 'Some("' . addslashes($innerRole) . '")' : "None") . ")",
+                "member" => 'Role::member("' . addslashes((string) $roleId) . '")',
+                "label" => 'Role::label("' . addslashes((string) $roleId) . '")',
                 default => 'Role::from("' . addslashes($roleName) . '")',
             };
 
@@ -542,15 +514,13 @@ class Rust extends Language
         return $this->getArrayOf(implode(", ", $permissions));
     }
 
-    /**
-     * @return array
-     */
+    #[Override]
     public function getFilters(): array
     {
         return [
             new TwigFilter(
                 "rustdocComment",
-                function ($value, $indent = 0) {
+                function ($value, $indent = 0): string {
                     $value = trim($value);
                     $value = explode("\n", $value);
                     $indent = \str_repeat(" ", $indent);
@@ -561,59 +531,18 @@ class Rust extends Language
                 },
                 ["is_safe" => ["html"]],
             ),
-            new TwigFilter("propertyType", function (
-                array $property,
-                array $spec = [],
-                string $generic = "serde_json::Value",
-            ) {
-                return $this->getPropertyType($property, $spec, $generic);
-            }),
-            new TwigFilter("returnType", function (
-                array $method,
-                array $spec,
-                string $namespace,
-                string $generic = "serde_json::Value",
-            ) {
-                return $this->getReturnType($method, $spec, $namespace, $generic);
-            }),
-            new TwigFilter("caseEnumKey", function (string $value) {
-                return $this->toPascalCase($value);
-            }),
-            new TwigFilter("docsArgumentExample", function (array $param, string $crateName) {
-                return $this->getDocsArgumentExample($param, $crateName);
-            }, ["is_safe" => ["html"]]),
-            new TwigFilter("inputType", function (
-                array $property,
-                array $spec = [],
-                string $generic = "serde_json::Value",
-            ) {
-                return $this->getInputType($property, $spec, $generic);
-            }),
-            new TwigFilter("paramValue", function (
-                array $property,
-                string $paramName,
-                array $spec = [],
-            ) {
-                return $this->getParamValue($property, $paramName, $spec);
-            }, ["is_safe" => ["html"]]),
-            new TwigFilter("rustType", function ($value) {
-                return str_replace(['&lt;', '&gt;'], ['<', '>'], $value);
-            }, ["is_safe" => ["html"]]),
-            new TwigFilter("rustCrateName", function ($value) {
-                return str_replace('-', '_', $value);
-            }),
-            new TwigFilter("stripProtocol", function ($value) {
-                return str_replace(['https://', 'http://'], '', $value);
-            }),
+            new TwigFilter("propertyType", fn(array $property, array $spec = [], string $generic = "serde_json::Value"): string => $this->getPropertyType($property, $spec, $generic)),
+            new TwigFilter("returnType", fn(array $method, array $spec, string $namespace, string $generic = "serde_json::Value"): string => $this->getReturnType($method, $spec, $namespace, $generic)),
+            new TwigFilter("caseEnumKey", fn(string $value): string => $this->toPascalCase($value)),
+            new TwigFilter("docsArgumentExample", fn(array $param, string $crateName): string => $this->getDocsArgumentExample($param, $crateName), ["is_safe" => ["html"]]),
+            new TwigFilter("inputType", fn(array $property, array $spec = [], string $generic = "serde_json::Value"): string => $this->getInputType($property, $spec, $generic)),
+            new TwigFilter("paramValue", fn(array $property, string $paramName, array $spec = []): string => $this->getParamValue($property, $paramName, $spec), ["is_safe" => ["html"]]),
+            new TwigFilter("rustType", fn($value): string|array => str_replace(['&lt;', '&gt;'], ['<', '>'], $value), ["is_safe" => ["html"]]),
+            new TwigFilter("rustCrateName", fn($value): string|array => str_replace('-', '_', $value)),
+            new TwigFilter("stripProtocol", fn($value): string|array => str_replace(['https://', 'http://'], '', $value)),
         ];
     }
 
-    /**
-     * @param array $property
-     * @param array $spec
-     * @param string $generic
-     * @return string
-     */
     protected function getPropertyType(array $property, array $spec, string $generic = "serde_json::Value"): string
     {
         if (\array_key_exists("sub_schemas", $property) && !empty($property["sub_schemas"])) {
@@ -621,7 +550,7 @@ class Rust extends Language
         }
 
         if (\array_key_exists("sub_schema", $property)) {
-            $type = "crate::models::" . ucfirst($property["sub_schema"]);
+            $type = "crate::models::" . ucfirst((string) $property["sub_schema"]);
 
             if ($property["type"] === "array") {
                 $type = "Vec<" . $type . ">";
@@ -635,11 +564,6 @@ class Rust extends Language
 
     /**
      * Get input type for method parameters (uses impl Into for better DX)
-     *
-     * @param array $property
-     * @param array $spec
-     * @param string $generic
-     * @return string
      */
     protected function getInputType(array $property, array $spec, string $generic = "serde_json::Value"): string
     {
@@ -699,7 +623,7 @@ class Rust extends Language
         $ret = $matches[0];
 
         foreach ($ret as &$match) {
-            $match = $match == strtoupper($match)
+            $match = $match === strtoupper($match)
                 ? strtolower($match)
                 : lcfirst($match);
         }
@@ -712,17 +636,17 @@ class Rust extends Language
         $itemType = $items["type"] ?? null;
 
         return match ($itemType) {
-            self::TYPE_INTEGER, self::TYPE_NUMBER => (string)$value,
+            self::TYPE_INTEGER, self::TYPE_NUMBER => (string) $value,
             self::TYPE_BOOLEAN => $value ? "true" : "false",
             self::TYPE_OBJECT => "serde_json::json!(" . json_encode($value, JSON_UNESCAPED_SLASHES) . ")",
-            self::TYPE_STRING => '"' . addslashes((string)$value) . '"' . ".into()",
+            self::TYPE_STRING => '"' . addslashes((string) $value) . '"' . ".into()",
             default => match (true) {
-                \is_string($value) => '"' . addslashes($value) . '"' . ".into()",
-                \is_bool($value) => $value ? "true" : "false",
-                \is_int($value), \is_float($value) => (string)$value,
-                \is_array($value) => "serde_json::json!(" . json_encode($value, JSON_UNESCAPED_SLASHES) . ")",
-                default => "serde_json::Value::Null",
-            },
+                    \is_string($value) => '"' . addslashes($value) . '"' . ".into()",
+                    \is_bool($value) => $value ? "true" : "false",
+                    \is_int($value), \is_float($value) => (string) $value,
+                    \is_array($value) => "serde_json::json!(" . json_encode($value, JSON_UNESCAPED_SLASHES) . ")",
+                    default => "serde_json::Value::Null",
+                },
         };
     }
 
@@ -739,7 +663,7 @@ class Rust extends Language
         $example = $param["example"] ?? null;
         $isArray = ($param["type"] ?? "") === self::TYPE_ARRAY;
 
-        $resolveKey = function ($value) use ($enumValues, $enumKeys) {
+        $resolveKey = function ($value) use ($enumValues, $enumKeys): string {
             $index = array_search($value, $enumValues, true);
 
             if ($index !== false && isset($enumKeys[$index]) && $enumKeys[$index] !== "") {
@@ -752,7 +676,7 @@ class Rust extends Language
 
             $fallback = $enumKeys[0] ?? $enumValues[0] ?? $value;
 
-            return $this->toPascalCase((string)$fallback);
+            return $this->toPascalCase((string) $fallback);
         };
 
         $enumPath = $prefix . $enumName . "::";
@@ -770,12 +694,12 @@ class Rust extends Language
                 $values = $example;
             }
 
-            if (empty($values)) {
+            if ($values === []) {
                 $values = [$enumValues[0]];
             }
 
             $items = array_map(
-                fn ($value) => $enumPath . $resolveKey($value),
+                fn($value): string => $enumPath . $resolveKey($value),
                 $values,
             );
 
@@ -810,11 +734,6 @@ class Rust extends Language
 
     /**
      * Get parameter value conversion expression for method body
-     *
-     * @param array $property
-     * @param string $paramName
-     * @param array $spec
-     * @return string
      */
     protected function getParamValue(array $property, string $paramName, array $spec): string
     {
@@ -834,13 +753,6 @@ class Rust extends Language
         return $paramName;
     }
 
-    /**
-     * @param array $method
-     * @param array $spec
-     * @param string $namespace
-     * @param string $generic
-     * @return string
-     */
     protected function getReturnType(
         array $method,
         array $spec,
@@ -874,26 +786,21 @@ class Rust extends Language
             return "crate::error::Result<serde_json::Value>";
         }
 
-        $ret = ucfirst($method["responseModel"]);
+        $ret = ucfirst((string) $method["responseModel"]);
 
         return "crate::error::Result<crate::models::" . $ret . ">";
     }
 
     protected function isEmptyResponse(array $responses): bool
     {
-        foreach ($responses as $code => $response) {
-            if (!in_array((int)$code, [204, 205])) {
+        foreach (array_keys($responses) as $code) {
+            if (!in_array((int) $code, [204, 205])) {
                 return false;
             }
         }
-        return !empty($responses);
+        return $responses !== [];
     }
 
-    /**
-     * @param string|null $model
-     * @param array $spec
-     * @return bool
-     */
     protected function hasGenericType(?string $model, array $spec): bool
     {
         if (empty($model) || $model === "any") {

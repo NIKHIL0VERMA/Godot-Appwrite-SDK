@@ -115,7 +115,7 @@ sdk-generator/blob/master/example.php:
 Run the following command (make sure you have an updated docker version on your machine):
 
 ```bash
-docker run --rm -v $(pwd):/app -w /app php:8.3-cli php example.php
+docker run --rm -v $(pwd):/app -w /app php:8.5-cli php example.php
 ```
 
 >Note: You can just add the new language next to the other languages in the `example.php` file. You don't need to rewrite the file completely.
@@ -198,29 +198,31 @@ Testing a single project that runs in multiple languages can be difficult. Manag
 
 To avoid that complexity, we have created a cross-platform mechanism that leverages Docker and a vanilla language file with no dependencies attached.
 
+Each test run starts the mock API server (`./mock-server`) with `docker compose up -d` and removes it again in the test teardown with `docker compose down`, so no containers are left behind. If a run is interrupted, clean up manually with `cd mock-server && docker compose down`.
+
 To add a new language test, you need to create a language file that initializes your SDK and call generated method in a predefined order. The test algorithm will evaluate your script output and determine whether the test passed or failed.
 
 The test algorithm will generate your SDK from a small demo SDK JSON spec file and will run your test on different versions of your chosen language.
 
 To get started, create a language file in this location:
 
-`./tests/languages/<language>/test.[MY-LANGUAGE-FILE-EXT]`
+`./tests/e2e/languages/<language>/test.[MY-LANGUAGE-FILE-EXT]`
 
-In your new language file, init your SDK from a relative path which will be generated here: `./tests/sdks/` from this spec file: `./tests/resources/spec.json`.
+In your new language file, init your SDK from a relative path which will be generated here: `./tests/e2e/sdks/` from this spec file: `./tests/resources/spec-openapi3.json`.
 
 After you finish initializing, make a series of HTTP calls using your newly generated SDKs method just like in one of these examples:
 
-1. tests/languages/php/test.php
-2. tests/languages/node/test.js
+1. tests/e2e/languages/php/test.php
+2. tests/e2e/languages/node/test.js
 
 > Note: In your test files, make sure that you begin the test with the following string "\nTest Started\n". We use this string to filter output from the build tool you're using.
 
-Once you're done, create a new test file `tests/[Language]Test.php` and update as the following.
+Once you're done, create a new test file `tests/e2e/[Language]Test.php` and update as the following.
 
 ```php
 <?php
 
-namespace Tests;
+namespace Tests\E2E;
 
 class [Language]Test extends Base
 {
@@ -250,19 +252,19 @@ A good example is the Dart test:
 ```php
 <?php
 
-namespace Tests;
+namespace Tests\E2E;
 
 class DartTest extends Base
 {
     protected string $language = 'dart';
     protected string $class = 'Appwrite\SDK\Language\Dart';
     protected array $build = [
-        'mkdir -p tests/sdks/dart/tests',
-        'cp tests/languages/dart/tests.dart tests/sdks/dart/tests/tests.dart',
+        'mkdir -p tests/e2e/sdks/dart/tests',
+        'cp tests/e2e/languages/dart/tests.dart tests/e2e/sdks/dart/tests/tests.dart',
     ];
     protected array $envs = [
-        'dart-stable' => 'docker run --rm -v $(pwd):/app -w /app/tests/sdks/dart dart:stable sh -c "dart pub get && dart pub run tests/tests.dart"',
-        'dart-beta' => 'docker run --rm -v $(pwd):/app -w /app/tests/sdks/dart dart:beta sh -c "dart pub get && dart pub run tests/tests.dart"',
+        'dart-stable' => 'docker run --rm -v $(pwd):/app -w /app/tests/e2e/sdks/dart dart:stable sh -c "dart pub get && dart pub run tests/tests.dart"',
+        'dart-beta' => 'docker run --rm -v $(pwd):/app -w /app/tests/e2e/sdks/dart dart:beta sh -c "dart pub get && dart pub run tests/tests.dart"',
     ];
     protected array $expectedOutput = [
         ...Base::FOO_RESPONSES,
@@ -277,7 +279,7 @@ Also in `.travis.yml` add new env `SDK=[Language]` so that travis will run a tes
 
 Finally, you can run tests using:
 ```sh
-docker run --rm -v $(pwd):$(pwd):rw -w $(pwd) -v /var/run/docker.sock:/var/run/docker.sock  php:8.3-cli-alpine sh -c "apk add docker-cli && vendor/bin/phpunit"
+docker run --rm -v $(pwd):$(pwd):rw -w $(pwd) -v /var/run/docker.sock:/var/run/docker.sock php:8.5-cli-alpine sh -c "apk add docker-cli && vendor/bin/phpunit"
 ```
 
 ## SDK Generator Interface

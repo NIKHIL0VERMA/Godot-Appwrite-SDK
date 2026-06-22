@@ -109,7 +109,7 @@ export class {{ service.name | caseUcfirst }} {
         {%~ endif %}
         {%~ endfor %}
 
-        const apiPath = '{{ method.path }}'{% for parameter in method.parameters.path %}.replace('{{ '{' }}{{ parameter.name | caseCamel | escapeKeyword }}{{ '}' }}', {{ parameter.name | caseCamel | escapeKeyword }}){% endfor %};
+        const apiPath = '{{ method.path }}'{% for parameter in method.parameters.path %}.replace('{{ '{' }}{{ parameter.name }}{{ '}' }}', encodeURIComponent(String({% if parameter.source|default('') == 'security' %}this.client.config.{{ parameter.config | caseLower }}{% else %}{{ parameter.name | caseCamel | escapeKeyword }}{% endif %}))){% endfor %};
         const payload: Payload = {};
         {%~ for parameter in method.parameters.query %}
         if (typeof {{ parameter.name | caseCamel | escapeKeyword }} !== 'undefined') {
@@ -122,8 +122,14 @@ export class {{ service.name | caseUcfirst }} {
         }
         {%~ endfor %}
         const uri = new URL(this.client.config.endpoint + apiPath);
+        {%~ for security in method.securityQueries %}
+        uri.searchParams.append('{{ security.name }}', this.client.config.{{ security.name | caseLower }});
+        {%~ endfor %}
 
         const apiHeaders: { [header: string]: string } = {
+            {%~ for key, security in method.securityHeaders %}
+            '{{ security.name }}': this.client.config.{{ key | caseLower }},
+            {%~ endfor %}
             {%~ for parameter in method.parameters.header %}
             '{{ parameter.name | caseCamel | escapeKeyword }}': this.client.${{ parameter.name | caseCamel | escapeKeyword }},
             {%~ endfor %}

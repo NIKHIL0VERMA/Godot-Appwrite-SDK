@@ -1,8 +1,10 @@
 <?php
 
-include_once 'vendor/autoload.php';
+include_once __DIR__ . '/vendor/autoload.php';
 
 use Appwrite\SDK\Language\GraphQL;
+use Appwrite\Spec\OpenAPI3;
+use Appwrite\Spec\Spec;
 use Appwrite\Spec\Swagger2;
 use Appwrite\Spec\StaticSpec;
 use Appwrite\SDK\SDK;
@@ -22,7 +24,7 @@ use Appwrite\SDK\Language\Flutter;
 use Appwrite\SDK\Language\Android;
 use Appwrite\SDK\Language\Kotlin;
 use Appwrite\SDK\Language\ReactNative;
-use Appwrite\SDK\Language\Markdown;
+use Appwrite\SDK\Language\Unity;
 use Appwrite\SDK\Language\AgentSkills;
 use Appwrite\SDK\Language\ClaudePlugin;
 use Appwrite\SDK\Language\CodexPlugin;
@@ -31,9 +33,23 @@ use Appwrite\SDK\Language\Rust;
 use Appwrite\SDK\Language\GDScript;
 use Appwrite\SDK\Language\Godot;
 
+final class Config
+{
+    public const string VERSION = '1.9.x';
+    public const string SPECS_URL = 'https://raw.githubusercontent.com/appwrite/specs/main/specs';
+    public const string TITLE = 'Appwrite';
+    public const string DESCRIPTION = 'Appwrite backend as a service';
+    public const string LICENSE_NAME = 'BSD-3-Clause';
+    public const string LICENSE_URL = 'https://raw.githubusercontent.com/appwrite/appwrite/master/LICENSE';
+    public const string COVER_IMAGE = 'https://github.com/appwrite/appwrite/raw/main/public/images/github.png';
+    public const string TWITTER = 'appwrite';
+    public const string DISCORD_CHANNEL = '564160730845151244';
+    public const string DISCORD_URL = 'https://appwrite.io/discord';
+}
+
 try {
 
-    function getSSLPage($url)
+    function getSSLPage(string $url): bool|string
     {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_HEADER, false);
@@ -41,11 +57,10 @@ try {
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $result = curl_exec($ch);
-        return $result;
+        return curl_exec($ch);
     }
 
-    function configureSDK($sdk, $overrides = [])
+    function configureSDK(SDK $sdk, array $overrides = []): SDK
     {
         $defaults = [
             'name' => 'NAME',
@@ -53,14 +68,14 @@ try {
             'description' => 'Repo description goes here',
             'shortDescription' => 'Repo short description goes here',
             'url' => 'https://example.com',
-            'coverImage' => 'https://github.com/appwrite/appwrite/raw/main/public/images/github.png',
+            'coverImage' => Config::COVER_IMAGE,
             'licenseContent' => 'test test test',
             'warning' => '**WORK IN PROGRESS - NOT READY FOR USAGE**',
             'changelog' => '**CHANGELOG**',
             'gitUserName' => 'repoowner',
             'gitRepoName' => 'reponame',
-            'twitter' => 'appwrite',
-            'discord' => ['564160730845151244', 'https://appwrite.io/discord'],
+            'twitter' => Config::TWITTER,
+            'discord' => [Config::DISCORD_CHANNEL, Config::DISCORD_URL],
             'readme' => '**README**',
             'exclude' => [
                 'services' => [
@@ -72,13 +87,13 @@ try {
 
         // Deep-merge exclude services so overrides add to defaults rather than replacing
         if (isset($overrides['exclude']['services']) && isset($defaults['exclude']['services'])) {
-            $overrides['exclude']['services'] = array_merge(
-                $defaults['exclude']['services'],
-                $overrides['exclude']['services']
-            );
+            $overrides['exclude']['services'] = [
+                ...$defaults['exclude']['services'],
+                ...$overrides['exclude']['services'],
+            ];
         }
 
-        $config = array_merge($defaults, $overrides);
+        $config = [...$defaults, ...$overrides];
 
         $sdk->setName($config['name'])
             ->setVersion($config['version'])
@@ -108,23 +123,51 @@ try {
         return $sdk;
     }
 
-    $requestedSdk = isset($argv[1]) ? $argv[1] : null;
-    $requestedPlatform = isset($argv[2]) ? $argv[2] : null;
-
-    if ($requestedPlatform) {
-        $platform = $requestedPlatform;
-    } else {
-        $platform = 'console';
-        // $platform = 'client';
-        // $platform = 'server';
+    function buildSpec(string $format, string $content): Spec
+    {
+        return $format === 'swagger2' ? new Swagger2($content) : new OpenAPI3($content);
     }
 
-    $version = '1.9.x';
+    function buildStaticSpec(): StaticSpec
+    {
+        return new StaticSpec(
+            title: Config::TITLE,
+            description: Config::DESCRIPTION,
+            version: Config::VERSION,
+            licenseName: Config::LICENSE_NAME,
+            licenseURL: Config::LICENSE_URL,
+        );
+    }
+
+    $requestedSdk = $argv[1] ?? null;
+    $requestedPlatform = $argv[2] ?? null;
+    $requestedFormat = $argv[3] ?? null;
+
+    $platform = $requestedPlatform ?: 'console';
+    // $platform = 'client';
+    // $platform = 'server';
+
+    // Spec format: 'openapi3' (default) or 'swagger2', e.g. php example.php node console swagger2
+    $specFormat = strtolower($requestedFormat ?: 'openapi3');
+    if (!in_array($specFormat, ['openapi3', 'swagger2'])) {
+        throw new Exception("Unsupported spec format: $specFormat (expected 'openapi3' or 'swagger2')");
+    }
+
+    $version = Config::VERSION;
     $speclessSDKs = ['agent-skills', 'cursor-plugin', 'claude-plugin', 'codex-plugin'];
     $needsSpec = !$requestedSdk || !in_array($requestedSdk, $speclessSDKs);
+    $spec = '';
 
     if ($needsSpec) {
-        $spec = getSSLPage("https://raw.githubusercontent.com/appwrite/specs/main/specs/{$version}/swagger2-{$version}-{$platform}.json");
+        // Optional local spec file override, e.g. SDK_GEN_SPEC_FILE=/path/to/spec.json
+        $specFile = getenv('SDK_GEN_SPEC_FILE');
+
+        if ($specFile) {
+            $spec = file_get_contents($specFile);
+        } else {
+            $specPrefix = $specFormat === 'swagger2' ? 'swagger2' : 'open-api3';
+            $spec = getSSLPage(Config::SPECS_URL . "/{$version}/{$specPrefix}-{$version}-{$platform}.json");
+        }
 
         if (empty($spec)) {
             throw new Exception('Failed to fetch spec from Appwrite server');
@@ -141,21 +184,30 @@ try {
         $php
             ->setComposerVendor('appwrite')
             ->setComposerPackage('appwrite');
-        $sdk = new SDK($php, new Swagger2($spec));
+        $sdk = new SDK($php, buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/php');
     }
 
+    // Unity
+    if (!$requestedSdk || $requestedSdk === 'unity') {
+        $unity = new Unity();
+        $unity->setPackageName('io.appwrite.unity');
+        $sdk = new SDK($unity, buildSpec($specFormat, $spec));
+        configureSDK($sdk);
+        $sdk->generate(__DIR__ . '/examples/unity');
+    }
+
     // Web
     if (!$requestedSdk || $requestedSdk === 'web') {
-        $sdk = new SDK(new Web(), new Swagger2($spec));
+        $sdk = new SDK(new Web(), buildSpec($specFormat, $spec));
         configureSDK($sdk, ['platform' => $platform]);
         $sdk->generate(__DIR__ . '/examples/web');
     }
 
     // Node
     if (!$requestedSdk || $requestedSdk === 'node') {
-        $sdk = new SDK(new Node(), new Swagger2($spec));
+        $sdk = new SDK(new Node(), buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/node');
     }
@@ -182,13 +234,17 @@ try {
   \_/ \_/ .__/| .__/ \_/\_/ |_|  |_|\__\___| \____/\____/\____/
         |_|   |_|                                                ");
 
-        $sdk = new SDK($language, new Swagger2($spec));
+        $sdk = new SDK($language, buildSpec($specFormat, $spec));
         $sdk->setTest(false);
         configureSDK($sdk, [
             'exclude' => [
                 'services' => [
                     ['name' => 'assistant'],
                     ['name' => 'avatars'],
+                    ['name' => 'advisor'],
+                    ['name' => 'compute'],
+                    ['name' => 'apps'],
+                    ['name' => 'oauth'],
                 ],
             ],
         ]);
@@ -198,14 +254,14 @@ try {
 
     // Ruby
     if (!$requestedSdk || $requestedSdk === 'ruby') {
-        $sdk = new SDK(new Ruby(), new Swagger2($spec));
+        $sdk = new SDK(new Ruby(), buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/ruby');
     }
 
     // Python
     if (!$requestedSdk || $requestedSdk === 'python') {
-        $sdk = new SDK(new Python(), new Swagger2($spec));
+        $sdk = new SDK(new Python(), buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/python');
     }
@@ -214,7 +270,7 @@ try {
     if (!$requestedSdk || $requestedSdk === 'dart') {
         $dart = new Dart();
         $dart->setPackageName('dart_appwrite');
-        $sdk = new SDK($dart, new Swagger2($spec));
+        $sdk = new SDK($dart, buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/dart');
     }
@@ -223,7 +279,7 @@ try {
     if (!$requestedSdk || $requestedSdk === 'flutter') {
         $flutter = new Flutter();
         $flutter->setPackageName('appwrite');
-        $sdk = new SDK($flutter, new Swagger2($spec));
+        $sdk = new SDK($flutter, buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/flutter');
     }
@@ -232,49 +288,49 @@ try {
     if (!$requestedSdk || $requestedSdk === 'react-native') {
         $reactNative = new ReactNative();
         $reactNative->setNPMPackage('react-native-appwrite');
-        $sdk = new SDK($reactNative, new Swagger2($spec));
+        $sdk = new SDK($reactNative, buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/react-native');
     }
 
     // GO
     if (!$requestedSdk || $requestedSdk === 'go') {
-        $sdk = new SDK(new Go(), new Swagger2($spec));
+        $sdk = new SDK(new Go(), buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/go');
     }
 
     // Swift
     if (!$requestedSdk || $requestedSdk === 'swift') {
-        $sdk = new SDK(new Swift(), new Swagger2($spec));
+        $sdk = new SDK(new Swift(), buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/swift');
     }
 
     // Apple
     if (!$requestedSdk || $requestedSdk === 'apple') {
-        $sdk = new SDK(new Apple(), new Swagger2($spec));
+        $sdk = new SDK(new Apple(), buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/apple');
     }
 
     // DotNet
     if (!$requestedSdk || $requestedSdk === 'dotnet') {
-        $sdk = new SDK(new DotNet(), new Swagger2($spec));
+        $sdk = new SDK(new DotNet(), buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/dotnet');
     }
 
     // REST
     if (!$requestedSdk || $requestedSdk === 'rest') {
-        $sdk = new SDK(new REST(), new Swagger2($spec));
+        $sdk = new SDK(new REST(), buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/REST');
     }
 
     // Android
     if (!$requestedSdk || $requestedSdk === 'android') {
-        $sdk = new SDK(new Android(), new Swagger2($spec));
+        $sdk = new SDK(new Android(), buildSpec($specFormat, $spec));
         configureSDK($sdk, [
             'namespace' => 'io.appwrite',
         ]);
@@ -283,7 +339,7 @@ try {
 
     // Kotlin
     if (!$requestedSdk || $requestedSdk === 'kotlin') {
-        $sdk = new SDK(new Kotlin(), new Swagger2($spec));
+        $sdk = new SDK(new Kotlin(), buildSpec($specFormat, $spec));
         configureSDK($sdk, [
             'namespace' => 'io.appwrite',
         ]);
@@ -292,94 +348,60 @@ try {
 
     // GraphQL
     if (!$requestedSdk || $requestedSdk === 'graphql') {
-        $sdk = new SDK(new GraphQL(), new Swagger2($spec));
+        $sdk = new SDK(new GraphQL(), buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/graphql');
     }
 
-    // Markdown
-    if (!$requestedSdk || $requestedSdk === 'markdown') {
-        $markdown = new Markdown();
-        $markdown->setNPMPackage('@appwrite.io/docs');
-        $sdk = new SDK($markdown, new Swagger2($spec));
-        configureSDK($sdk);
-        $sdk->generate(__DIR__ . '/examples/markdown');
-    }
     // Agent Skills
     if (!$requestedSdk || $requestedSdk === 'agent-skills') {
-        $sdk = new SDK(new AgentSkills(), new StaticSpec(
-            title: 'Appwrite',
-            description: 'Appwrite backend as a service',
-            version: $version,
-            licenseName: 'BSD-3-Clause',
-            licenseURL: 'https://raw.githubusercontent.com/appwrite/appwrite/master/LICENSE',
-        ));
+        $sdk = new SDK(new AgentSkills(), buildStaticSpec());
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/agent-skills');
     }
 
     // Cursor Plugin
     if (!$requestedSdk || $requestedSdk === 'cursor-plugin') {
-        $sdk = new SDK(new CursorPlugin(), new StaticSpec(
-            title: 'Appwrite',
-            description: 'Appwrite backend as a service',
-            version: $version,
-            licenseName: 'BSD-3-Clause',
-            licenseURL: 'https://raw.githubusercontent.com/appwrite/appwrite/master/LICENSE',
-        ));
+        $sdk = new SDK(new CursorPlugin(), buildStaticSpec());
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/cursor-plugin');
     }
 
     // Claude Plugin
     if (!$requestedSdk || $requestedSdk === 'claude-plugin') {
-        $sdk = new SDK(new ClaudePlugin(), new StaticSpec(
-            title: 'Appwrite',
-            description: 'Appwrite backend as a service',
-            version: $version,
-            licenseName: 'BSD-3-Clause',
-            licenseURL: 'https://raw.githubusercontent.com/appwrite/appwrite/master/LICENSE',
-        ));
+        $sdk = new SDK(new ClaudePlugin(), buildStaticSpec());
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/claude-plugin');
     }
 
     // Codex Plugin
     if (!$requestedSdk || $requestedSdk === 'codex-plugin') {
-        $sdk = new SDK(new CodexPlugin(), new StaticSpec(
-            title: 'Appwrite',
-            description: 'Appwrite backend as a service',
-            version: $version,
-            licenseName: 'BSD-3-Clause',
-            licenseURL: 'https://raw.githubusercontent.com/appwrite/appwrite/master/LICENSE',
-        ));
+        $sdk = new SDK(new CodexPlugin(), buildStaticSpec());
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/codex-plugin');
     }
 
     // Rust
     if (!$requestedSdk || $requestedSdk === 'rust') {
-        $sdk = new SDK(new Rust(), new Swagger2($spec));
+        $sdk = new SDK(new Rust(), buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/rust');
     }
 
     // GDScript
     if (!$requestedSdk || $requestedSdk === 'gdscript') {
-        $sdk = new SDK(new GDScript(), new Swagger2($spec));
+        $sdk = new SDK(new GDScript(), buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/gdscript');
     }
 
     // Godot
     if (!$requestedSdk || $requestedSdk === 'godot') {
-        $sdk = new SDK(new Godot(), new Swagger2($spec));
+        $sdk = new SDK(new Godot(), buildSpec($specFormat, $spec));
         configureSDK($sdk);
         $sdk->generate(__DIR__ . '/examples/godot');
     }
 } catch (Exception $exception) {
-    echo 'Error: ' . $exception->getMessage() . ' on ' . $exception->getFile() . ':' . $exception->getLine() . "\n";
-} catch (Throwable $exception) {
     echo 'Error: ' . $exception->getMessage() . ' on ' . $exception->getFile() . ':' . $exception->getLine() . "\n";
 }
 

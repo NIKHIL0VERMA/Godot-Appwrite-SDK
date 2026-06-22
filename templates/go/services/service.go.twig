@@ -2,7 +2,7 @@
 {%- set requireFilesPkg = false -%}
 {%- set requireUrlPkg = false -%}
 {%- for method in service.methods -%}
-{%- if method.type == 'location' -%}
+{%- if method.type == 'location' or method.securityQueries | length > 0 -%}
 {%- set requireUrlPkg = true -%}
 {%- endif -%}
 {%- endfor -%}
@@ -125,11 +125,14 @@ func (srv *{{ service.name | caseUcfirst }}) With{{ method.name | caseUcfirst }}
 {% set returnType = method | returnType(spec, spec.title | caseLower) %}
 func (srv *{{ service.name | caseUcfirst }}) {{ method.name | caseUcfirst }}({{ params }})({% if returnType == 'models.Model' %}{{ returnType }}{% else %}*{{ returnType }}{% endif %}, error) {
 {% if method.parameters.path|length > 0 %}
-	r := strings.NewReplacer({% for parameter in method.parameters.path %}"{{ '{' }}{{ parameter.name | caseCamel }}{{ '}' }}", {{ parameter.name | caseUcfirst }}{% if not loop.last %}, {% endif %}{% endfor %})
+	r := strings.NewReplacer({% for parameter in method.parameters.path %}"{{ '{' }}{{ parameter.name }}{{ '}' }}", {% if parameter.source|default('') == 'security' %}srv.client.Config["{{ parameter.config | caseLower }}"]{% else %}{{ parameter.name | caseUcfirst }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %})
 	path := r.Replace("{{ method.path }}")
 {% else %}
 	path := "{{ method.path }}"
 {% endif %}
+{%~ for security in method.securityQueries %}
+	path += "{% if loop.first %}?{% else %}&{% endif %}{{ security.name }}=" + url.QueryEscape(srv.client.Config["{{ security.name | caseLower }}"])
+{%~ endfor %}
 {{include('go/base/params.twig')}}
 {% if 'multipart/form-data' in method.consumes %}
 {{ include('go/base/requests/file.twig') }}
@@ -154,7 +157,7 @@ func (srv *{{ service.name | caseUcfirst }}) {{ method.name | caseUcfirst }}({{ 
 {% endif %}
 func (srv *{{ service.name | caseUcfirst }}) {{ method.name | caseUcfirst }}URL({{ params }}) (*string, error) {
 {% if method.parameters.path|length > 0 %}
-	r := strings.NewReplacer({% for parameter in method.parameters.path %}"{{ '{' }}{{ parameter.name | caseCamel }}{{ '}' }}", {{ parameter.name | caseUcfirst }}{% if not loop.last %}, {% endif %}{% endfor %})
+	r := strings.NewReplacer({% for parameter in method.parameters.path %}"{{ '{' }}{{ parameter.name }}{{ '}' }}", {% if parameter.source|default('') == 'security' %}srv.client.Config["{{ parameter.config | caseLower }}"]{% else %}{{ parameter.name | caseUcfirst }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %})
 	path := r.Replace("{{ method.path }}")
 {% else %}
 	path := "{{ method.path }}"

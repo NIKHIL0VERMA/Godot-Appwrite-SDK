@@ -2,15 +2,13 @@
 
 namespace Appwrite\SDK\Language;
 
+use Override;
 use Appwrite\SDK\Language;
 use Twig\TwigFilter;
 use Twig\TwigFunction;
 
 class DotNet extends Language
 {
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'DotNet';
@@ -18,8 +16,6 @@ class DotNet extends Language
 
     /**
      * Get Language Keywords List
-     *
-     * @return array
      */
     public function getKeywords(): array
     {
@@ -135,9 +131,6 @@ class DotNet extends Language
         ];
     }
 
-    /**
-     * @return array
-     */
     public function getIdentifierOverrides(): array
     {
         return [
@@ -151,6 +144,16 @@ class DotNet extends Language
         return '.';
     }
 
+    #[Override]
+    public function escapeKeyword(string $value): string
+    {
+        if (in_array($value, $this->getKeywords())) {
+            return '@' . $value;
+        }
+
+        return $value;
+    }
+
     public function getStringQuote(): string
     {
         return '"';
@@ -161,11 +164,13 @@ class DotNet extends Language
         return 'new List<string> { ' . $elements . ' }';
     }
 
+    #[Override]
     protected function transformPermissionAction(string $action): string
     {
         return ucfirst($action);
     }
 
+    #[Override]
     protected function transformPermissionRole(string $role): string
     {
         return ucfirst($role);
@@ -180,10 +185,6 @@ class DotNet extends Language
         ];
     }
 
-    /**
-     * @param array $parameter
-     * @return string
-     */
     public function getTypeName(array $parameter, array $spec = []): string
     {
         if (
@@ -192,7 +193,7 @@ class DotNet extends Language
         ) {
             $enumType = isset($parameter['enumName'])
                 ? \ucfirst($parameter['enumName'])
-                : \ucfirst($parameter['name']);
+                : \ucfirst((string) $parameter['name']);
 
             return 'List<Appwrite.Enums.' . $enumType . '>';
         }
@@ -201,13 +202,13 @@ class DotNet extends Language
             return 'Appwrite.Enums.' . \ucfirst($parameter['enumName']);
         }
         if (!empty($parameter['enumValues'])) {
-            return 'Appwrite.Enums.' . \ucfirst($parameter['name']);
+            return 'Appwrite.Enums.' . \ucfirst((string) $parameter['name']);
         }
         if (!empty($parameter['array']['model'])) {
-            return 'List<Appwrite.Models.' . $this->toPascalCase($parameter['array']['model']) . '>';
+            return 'List<Appwrite.Models.' . $this->getTypeIdentifier($parameter['array']['model']) . '>';
         }
         if (!empty($parameter['model'])) {
-            $modelType = 'Appwrite.Models.' . $this->toPascalCase($parameter['model']);
+            $modelType = 'Appwrite.Models.' . $this->getTypeIdentifier($parameter['model']);
             return $parameter['type'] === self::TYPE_ARRAY ? 'List<' . $modelType . '>' : $modelType;
         }
         if (isset($parameter['items'])) {
@@ -221,22 +222,18 @@ class DotNet extends Language
             self::TYPE_BOOLEAN => 'bool',
             self::TYPE_FILE => 'InputFile',
             self::TYPE_ARRAY => (!empty(($parameter['array'] ?? [])['type']) && !\is_array($parameter['array']['type']))
-                ? 'List<' . $this->getTypeName($parameter['array']) . '>'
-                : 'List<object>',
+            ? 'List<' . $this->getTypeName($parameter['array']) . '>'
+            : 'List<object>',
             self::TYPE_OBJECT => 'object',
             default => $parameter['type']
         };
     }
 
-    /**
-     * @param array $param
-     * @return string
-     */
     public function getParamDefault(array $param): string
     {
-        $type       = $param['type'] ?? '';
-        $default    = $param['default'] ?? '';
-        $required   = $param['required'] ?? '';
+        $type = $param['type'] ?? '';
+        $default = $param['default'] ?? '';
+        $required = $param['required'] ?? '';
 
         if ($required) {
             return '';
@@ -285,8 +282,8 @@ class DotNet extends Language
      */
     public function getParamExample(array $param, string $lang = '', array $spec = []): string
     {
-        $type       = $param['type'] ?? '';
-        $example    = $param['example'] ?? '';
+        $type = $param['type'] ?? '';
+        $example = $param['example'] ?? '';
 
         $output = '';
 
@@ -336,7 +333,7 @@ class DotNet extends Language
                     if ($example === '{}') {
                         $output .= '[object]';
                     } else {
-                        $decoded = json_decode($example, true);
+                        $decoded = json_decode((string) $example, true);
                         if ($decoded && is_array($decoded)) {
                             $csharpObject = $this->formatCSharpAnonymousObject($decoded, 1);
                             $output .= 'new ' . $csharpObject;
@@ -357,181 +354,161 @@ class DotNet extends Language
         return $output;
     }
 
-    /**
-     * @return array
-     */
     public function getFiles(): array
     {
         return [
             [
-                'scope'         => 'default',
-                'destination'   => '.github/workflows/publish.yml',
-                'template'      => 'dotnet/.github/workflows/publish.yml.twig',
+                'scope' => 'default',
+                'destination' => '.github/workflows/publish.yml',
+                'template' => 'dotnet/.github/workflows/publish.yml.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'CHANGELOG.md',
-                'template'      => 'dotnet/CHANGELOG.md.twig',
+                'scope' => 'default',
+                'destination' => 'CHANGELOG.md',
+                'template' => 'dotnet/CHANGELOG.md.twig',
             ],
             [
-                'scope'         => 'copy',
-                'destination'   => '/icon.png',
-                'template'      => 'dotnet/icon.png',
+                'scope' => 'copy',
+                'destination' => '/icon.png',
+                'template' => 'dotnet/icon.png',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'LICENSE',
-                'template'      => 'dotnet/LICENSE.twig',
+                'scope' => 'default',
+                'destination' => 'LICENSE',
+                'template' => 'dotnet/LICENSE.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'README.md',
-                'template'      => 'dotnet/README.md.twig',
+                'scope' => 'default',
+                'destination' => 'README.md',
+                'template' => 'dotnet/README.md.twig',
             ],
             [
-                'scope'         => 'method',
-                'destination'   => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
-                'template'      => 'dotnet/docs/example.md.twig',
+                'scope' => 'method',
+                'destination' => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
+                'template' => 'dotnet/docs/example.md.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}.sln',
-                'template'      => 'dotnet/Package.sln',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}.sln',
+                'template' => 'dotnet/Package.sln',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'Directory.Build.props',
-                'template'      => 'dotnet/Directory.Build.props.twig',
+                'scope' => 'default',
+                'destination' => 'Directory.Build.props',
+                'template' => 'dotnet/Directory.Build.props.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/{{ spec.title | caseUcfirst }}.csproj',
-                'template'      => 'dotnet/Package/Package.csproj.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/{{ spec.title | caseUcfirst }}.csproj',
+                'template' => 'dotnet/Package/Package.csproj.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Client.cs',
-                'template'      => 'dotnet/Package/Client.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Client.cs',
+                'template' => 'dotnet/Package/Client.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/{{ spec.title | caseUcfirst }}Exception.cs',
-                'template'      => 'dotnet/Package/Exception.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/{{ spec.title | caseUcfirst }}Exception.cs',
+                'template' => 'dotnet/Package/Exception.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/ID.cs',
-                'template'      => 'dotnet/Package/ID.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/ID.cs',
+                'template' => 'dotnet/Package/ID.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Permission.cs',
-                'template'      => 'dotnet/Package/Permission.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Permission.cs',
+                'template' => 'dotnet/Package/Permission.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Query.cs',
-                'template'      => 'dotnet/Package/Query.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Query.cs',
+                'template' => 'dotnet/Package/Query.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Operator.cs',
-                'template'      => 'dotnet/Package/Operator.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Operator.cs',
+                'template' => 'dotnet/Package/Operator.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Role.cs',
-                'template'      => 'dotnet/Package/Role.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Role.cs',
+                'template' => 'dotnet/Package/Role.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Converters/ValueClassConverter.cs',
-                'template'      => 'dotnet/Package/Converters/ValueClassConverter.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Converters/ValueClassConverter.cs',
+                'template' => 'dotnet/Package/Converters/ValueClassConverter.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Converters/ObjectToInferredTypesConverter.cs',
-                'template'      => 'dotnet/Package/Converters/ObjectToInferredTypesConverter.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Converters/ObjectToInferredTypesConverter.cs',
+                'template' => 'dotnet/Package/Converters/ObjectToInferredTypesConverter.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Extensions/Extensions.cs',
-                'template'      => 'dotnet/Package/Extensions/Extensions.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Extensions/Extensions.cs',
+                'template' => 'dotnet/Package/Extensions/Extensions.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Models/OrderType.cs',
-                'template'      => 'dotnet/Package/Models/OrderType.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Models/OrderType.cs',
+                'template' => 'dotnet/Package/Models/OrderType.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Models/UploadProgress.cs',
-                'template'      => 'dotnet/Package/Models/UploadProgress.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Models/UploadProgress.cs',
+                'template' => 'dotnet/Package/Models/UploadProgress.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Models/InputFile.cs',
-                'template'      => 'dotnet/Package/Models/InputFile.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Models/InputFile.cs',
+                'template' => 'dotnet/Package/Models/InputFile.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Services/Service.cs',
-                'template'      => 'dotnet/Package/Services/Service.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Services/Service.cs',
+                'template' => 'dotnet/Package/Services/Service.cs.twig',
             ],
             [
-                'scope'         => 'service',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Services/{{service.name | caseUcfirst}}.cs',
-                'template'      => 'dotnet/Package/Services/ServiceTemplate.cs.twig',
+                'scope' => 'service',
+                'destination' => '{{ spec.title | caseUcfirst }}/Services/{{service.name | caseUcfirst}}.cs',
+                'template' => 'dotnet/Package/Services/ServiceTemplate.cs.twig',
             ],
             [
-                'scope'         => 'definition',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Models/{{ definition.name | caseUcfirst | overrideIdentifier }}.cs',
-                'template'      => 'dotnet/Package/Models/Model.cs.twig',
+                'scope' => 'definition',
+                'destination' => '{{ spec.title | caseUcfirst }}/Models/{{ definition.name | caseUcfirst | overrideIdentifier }}.cs',
+                'template' => 'dotnet/Package/Models/Model.cs.twig',
             ],
             [
-                'scope'         => 'requestModel',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Models/{{ requestModel.name | caseUcfirst | overrideIdentifier }}.cs',
-                'template'      => 'dotnet/Package/Models/RequestModel.cs.twig',
+                'scope' => 'requestModel',
+                'destination' => '{{ spec.title | caseUcfirst }}/Models/{{ requestModel.name | caseUcfirst | overrideIdentifier }}.cs',
+                'template' => 'dotnet/Package/Models/RequestModel.cs.twig',
             ],
             [
-                'scope'         => 'enum',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Enums/{{ enum.name | caseUcfirst | overrideIdentifier }}.cs',
-                'template'      => 'dotnet/Package/Enums/Enum.cs.twig',
+                'scope' => 'enum',
+                'destination' => '{{ spec.title | caseUcfirst }}/Enums/{{ enum.name | caseUcfirst | overrideIdentifier }}.cs',
+                'template' => 'dotnet/Package/Enums/Enum.cs.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseUcfirst }}/Enums/IEnum.cs',
-                'template'      => 'dotnet/Package/Enums/IEnum.cs.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseUcfirst }}/Enums/IEnum.cs',
+                'template' => 'dotnet/Package/Enums/IEnum.cs.twig',
             ]
         ];
     }
 
+    #[Override]
     public function getFilters(): array
     {
         return [
-            new TwigFilter('dotnetComment', function ($value) {
-                $value = explode("\n", $value);
-                foreach ($value as $key => $line) {
-                    $value[$key] = "        /// " . wordwrap($line, 75, "\n        /// ");
-                }
-                return implode("\n", $value);
-            }, ['is_safe' => ['html']]),
-            new TwigFilter('caseEnumKey', function (string $value) {
-                return $this->toPascalCase($value);
-            }),
-            new TwigFilter('overrideProperty', function (string $property, string $class) {
-                if (isset($this->getPropertyOverrides()[$class][$property])) {
-                    return $this->getPropertyOverrides()[$class][$property];
-                }
-                return $property;
-            }),
-            new TwigFilter('propertyType', function (array $property, array $spec = []) {
-                return $this->getPropertyType($property, $spec);
-            }),
-            new TwigFilter('toMapValue', function (array $property, string $resolvedName) {
-                return $this->getToMapExpression($property, $resolvedName);
-            }, ['is_safe' => ['html']]),
-            new TwigFilter('enumExample', function (array $param) {
+            new TwigFilter('caseEnumKey', fn(string $value): string => $this->toPascalCase($value)),
+            new TwigFilter('overrideProperty', fn(string $property, string $class) => $this->getPropertyOverrides()[$class][$property] ?? $property),
+            new TwigFilter('propertyType', fn(array $property, array $spec = []): string => $this->getPropertyType($property, $spec)),
+            new TwigFilter('toMapValue', fn(array $property, string $resolvedName): string => $this->getToMapExpression($property, $resolvedName), ['is_safe' => ['html']]),
+            new TwigFilter('enumExample', function (array $param): string {
                 $enumValues = $param['enumValues'] ?? [];
                 if (empty($enumValues)) {
                     return '';
@@ -542,7 +519,7 @@ class DotNet extends Language
                 $example = $param['example'] ?? null;
                 $isArray = ($param['type'] ?? '') === self::TYPE_ARRAY;
 
-                $resolveKey = function ($value) use ($enumValues, $enumKeys) {
+                $resolveKey = function ($value) use ($enumValues, $enumKeys): string {
                     $index = array_search($value, $enumValues, true);
                     if ($index !== false && isset($enumKeys[$index]) && $enumKeys[$index] !== '') {
                         return $this->toPascalCase($enumKeys[$index]);
@@ -551,7 +528,7 @@ class DotNet extends Language
                         return $this->toPascalCase($enumValues[$index]);
                     }
                     $fallback = $enumKeys[0] ?? $enumValues[0] ?? $value;
-                    return $this->toPascalCase((string)$fallback);
+                    return $this->toPascalCase((string) $fallback);
                 };
 
                 if ($isArray) {
@@ -565,13 +542,11 @@ class DotNet extends Language
                         $values = $example;
                     }
 
-                    if (empty($values)) {
+                    if ($values === []) {
                         $values = [$enumValues[0]];
                     }
 
-                    $items = array_map(function ($value) use ($enumName, $resolveKey) {
-                        return $enumName . '.' . $resolveKey($value);
-                    }, $values);
+                    $items = array_map(fn($value): string => $enumName . '.' . $resolveKey($value), $values);
 
                     return 'new List<' . $enumName . '> { ' . implode(', ', $items) . ' }';
                 }
@@ -584,15 +559,11 @@ class DotNet extends Language
 
     /**
      * Get property type for request models
-     *
-     * @param array $property
-     * @param array $spec
-     * @return string
      */
     protected function getPropertyType(array $property, array $spec = [], bool $fullyQualified = true): string
     {
         if (isset($property['sub_schema']) && !empty($property['sub_schema'])) {
-            $type = $this->toPascalCase($property['sub_schema']);
+            $type = $this->getTypeIdentifier($property['sub_schema']);
 
             if ($property['type'] === 'array') {
                 return 'List<' . $type . '>';
@@ -613,10 +584,11 @@ class DotNet extends Language
      * get sub_scheme and property_name functions
      * @return TwigFunction[]
      */
+    #[Override]
     public function getFunctions(): array
     {
         return [
-            new TwigFunction('sub_schema', function (array $property) {
+            new TwigFunction('sub_schema', function (array $property): string {
                 $result = $this->getPropertyType($property, [], false);
 
                 if (!($property['required'] ?? true)) {
@@ -625,27 +597,37 @@ class DotNet extends Language
 
                 return $result;
             }, ['is_safe' => ['html']]),
-            new TwigFunction('property_name', function (array $definition, array $property) {
-                return $this->getPropertyName($property);
-            }),
+            new TwigFunction('property_name', fn(array $definition, array $property): string => $this->getPropertyName($definition, $property)),
         ];
     }
 
     /**
      * Generate property name for C# model
-     *
-     * @param array $property
-     * @return string
      */
-    protected function getPropertyName(array $property): string
+    protected function getPropertyName(array $definition, array $property): string
     {
         $name = $property['name'];
         $name = \str_replace('$', '', $name);
         $name = $this->toPascalCase($name);
+
+        // Generated models expose a static From(...) factory. A property named
+        // From would collide with that member; JsonPropertyName still preserves
+        // the original JSON key.
+        if ($name === $this->getTypeIdentifier($definition['name']) || $name === 'From') {
+            $name = 'X' . $name;
+        }
+
         if (\in_array($name, $this->getKeywords())) {
             $name = '@' . $name;
         }
         return $name;
+    }
+
+    protected function getTypeIdentifier(string $value): string
+    {
+        $value = $this->toPascalCase($value);
+
+        return $this->getIdentifierOverrides()[$value] ?? $value;
     }
 
     /**
@@ -656,9 +638,7 @@ class DotNet extends Language
      * filter never derives the name itself, so there is no risk of drift
      * between the declared property and the ToMap() reference.
      *
-     * @param array $property
      * @param string $resolvedName  C# identifier already produced by the template
-     * @return string
      */
     protected function getToMapExpression(array $property, string $resolvedName): string
     {
@@ -717,7 +697,7 @@ class DotNet extends Language
             if (array_keys($value) !== range(0, count($value) - 1)) {
                 return $this->formatCSharpAnonymousObject($value, $indentLevel);
             } else {
-                $items = array_map(fn($item) => $this->formatCSharpValue($item, $indentLevel), $value);
+                $items = array_map(fn($item): string => $this->formatCSharpValue($item, $indentLevel), $value);
                 return 'new[] { ' . implode(', ', $items) . ' }';
             }
         } else {

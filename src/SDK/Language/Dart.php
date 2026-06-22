@@ -2,6 +2,7 @@
 
 namespace Appwrite\SDK\Language;
 
+use Override;
 use Appwrite\SDK\Language;
 use Twig\TwigFilter;
 
@@ -10,12 +11,12 @@ class Dart extends Language
     /**
      * @var array
      */
+    #[Override]
     protected $params = [
         'packageName' => 'packageName',
     ];
 
     /**
-     * @param string $name
      * @return $this
      */
     public function setPackageName(string $name): self
@@ -25,9 +26,6 @@ class Dart extends Language
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'Dart';
@@ -35,8 +33,6 @@ class Dart extends Language
 
     /**
      * Get Language Keywords List
-     *
-     * @return array
      */
     public function getKeywords(): array
     {
@@ -107,9 +103,6 @@ class Dart extends Language
         ];
     }
 
-    /**
-     * @return array
-     */
     public function getIdentifierOverrides(): array
     {
         return [
@@ -136,10 +129,6 @@ class Dart extends Language
         return '[' . $elements . ']';
     }
 
-    /**
-     * @param array $parameter
-     * @return string
-     */
     public function getTypeName(array $parameter, array $spec = []): string
     {
         if (
@@ -148,7 +137,7 @@ class Dart extends Language
         ) {
             $enumType = isset($parameter['enumName'])
                 ? \ucfirst($parameter['enumName'])
-                : \ucfirst($parameter['name']);
+                : \ucfirst((string) $parameter['name']);
 
             return 'List<enums.' . $enumType . '>';
         }
@@ -157,7 +146,7 @@ class Dart extends Language
             return 'enums.' . \ucfirst($parameter['enumName']);
         }
         if (!empty($parameter['enumValues'])) {
-            return 'enums.' . \ucfirst($parameter['name']);
+            return 'enums.' . \ucfirst((string) $parameter['name']);
         }
         if (!empty($parameter['array']['model'])) {
             return 'List<models.' . $this->toPascalCase($parameter['array']['model']) . '>';
@@ -193,15 +182,11 @@ class Dart extends Language
         }
     }
 
-    /**
-     * @param array $param
-     * @return string
-     */
     public function getParamDefault(array $param): string
     {
-        $type       = $param['type'] ?? '';
-        $default    = $param['default'] ?? '';
-        $required   = $param['required'] ?? '';
+        $type = $param['type'] ?? '';
+        $default = $param['default'] ?? '';
+        $required = $param['required'] ?? '';
 
         if ($required) {
             return '';
@@ -258,8 +243,8 @@ class Dart extends Language
      */
     public function getParamExample(array $param, string $lang = '', array $spec = []): string
     {
-        $type       = $param['type'] ?? '';
-        $example    = $param['example'] ?? '';
+        $type = $param['type'] ?? '';
+        $example = $param['example'] ?? '';
 
         $hasExample = !empty($example) || $example === 0 || $example === false;
 
@@ -290,7 +275,7 @@ class Dart extends Language
     public function getModelToMapValue(array $property): string
     {
         $name = $this->escapeKeyword($property['name'] ?? '');
-        $nullAware = !empty($property['required']) ? '' : '?';
+        $nullAware = empty($property['required']) ? '?' : '';
 
         if (!empty($property['sub_schema'])) {
             if (($property['type'] ?? '') === self::TYPE_ARRAY) {
@@ -307,274 +292,263 @@ class Dart extends Language
         return $name;
     }
 
-    /**
-     * @return array
-     */
     public function getFiles(): array
     {
         return [
             [
-                'scope'         => 'default',
-                'destination'   => 'README.md',
-                'template'      => 'dart/README.md.twig',
+                'scope' => 'default',
+                'destination' => 'README.md',
+                'template' => 'dart/README.md.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/example/README.md',
-                'template'      => 'dart/example/README.md.twig',
+                'scope' => 'default',
+                'destination' => '/example/README.md',
+                'template' => 'dart/example/README.md.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'CHANGELOG.md',
-                'template'      => 'dart/CHANGELOG.md.twig',
+                'scope' => 'default',
+                'destination' => 'CHANGELOG.md',
+                'template' => 'dart/CHANGELOG.md.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'LICENSE',
-                'template'      => 'dart/LICENSE.twig',
+                'scope' => 'default',
+                'destination' => 'LICENSE',
+                'template' => 'dart/LICENSE.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/src/client.dart',
-                'template'      => 'dart/lib/src/client.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/src/client.dart',
+                'template' => 'dart/lib/src/client.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/src/client_base.dart',
-                'template'      => 'dart/lib/src/client_base.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/src/client_base.dart',
+                'template' => 'dart/lib/src/client_base.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/src/client_browser.dart',
-                'template'      => 'dart/lib/src/client_browser.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/src/client_browser.dart',
+                'template' => 'dart/lib/src/client_browser.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/src/client_io.dart',
-                'template'      => 'dart/lib/src/client_io.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/src/client_io.dart',
+                'template' => 'dart/lib/src/client_io.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/src/client_mixin.dart',
-                'template'      => 'dart/lib/src/client_mixin.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/src/client_mixin.dart',
+                'template' => 'dart/lib/src/client_mixin.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/src/client_stub.dart',
-                'template'      => 'dart/lib/src/client_stub.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/src/client_stub.dart',
+                'template' => 'dart/lib/src/client_stub.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/src/exception.dart',
-                'template'      => 'dart/lib/src/exception.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/src/exception.dart',
+                'template' => 'dart/lib/src/exception.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/src/upload_progress.dart',
-                'template'      => 'dart/lib/src/upload_progress.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/src/upload_progress.dart',
+                'template' => 'dart/lib/src/upload_progress.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/src/response.dart',
-                'template'      => 'dart/lib/src/response.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/src/response.dart',
+                'template' => 'dart/lib/src/response.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/permission.dart',
-                'template'      => 'dart/lib/permission.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/permission.dart',
+                'template' => 'dart/lib/permission.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/role.dart',
-                'template'      => 'dart/lib/role.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/role.dart',
+                'template' => 'dart/lib/role.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/id.dart',
-                'template'      => 'dart/lib/id.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/id.dart',
+                'template' => 'dart/lib/id.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/query.dart',
-                'template'      => 'dart/lib/query.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/query.dart',
+                'template' => 'dart/lib/query.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/operator.dart',
-                'template'      => 'dart/lib/operator.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/operator.dart',
+                'template' => 'dart/lib/operator.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/{{ language.params.packageName }}.dart',
-                'template'      => 'dart/lib/package.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/{{ language.params.packageName }}.dart',
+                'template' => 'dart/lib/package.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/pubspec.yaml',
-                'template'      => 'dart/pubspec.yaml.twig',
+                'scope' => 'default',
+                'destination' => '/pubspec.yaml',
+                'template' => 'dart/pubspec.yaml.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/analysis_options.yaml',
-                'template'      => 'dart/analysis_options.yaml.twig',
+                'scope' => 'default',
+                'destination' => '/analysis_options.yaml',
+                'template' => 'dart/analysis_options.yaml.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/client_io.dart',
-                'template'      => 'dart/lib/client_io.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/client_io.dart',
+                'template' => 'dart/lib/client_io.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/client_browser.dart',
-                'template'      => 'dart/lib/client_browser.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/client_browser.dart',
+                'template' => 'dart/lib/client_browser.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/src/service.dart',
-                'template'      => 'dart/lib/src/service.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/src/service.dart',
+                'template' => 'dart/lib/src/service.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/src/enums.dart',
-                'template'      => 'dart/lib/src/enums.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/src/enums.dart',
+                'template' => 'dart/lib/src/enums.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/src/models/model.dart',
-                'template'      => 'dart/lib/src/models/model_base.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/src/models/model.dart',
+                'template' => 'dart/lib/src/models/model_base.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/models.dart',
-                'template'      => 'dart/lib/models.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/models.dart',
+                'template' => 'dart/lib/models.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/lib/enums.dart',
-                'template'      => 'dart/lib/enums.dart.twig',
+                'scope' => 'default',
+                'destination' => '/lib/enums.dart',
+                'template' => 'dart/lib/enums.dart.twig',
             ],
             [
-                'scope'         => 'service',
-                'destination'   => '/lib/services/{{service.name | caseSnake}}.dart',
-                'template'      => 'dart/lib/services/service.dart.twig',
+                'scope' => 'service',
+                'destination' => '/lib/services/{{service.name | caseSnake}}.dart',
+                'template' => 'dart/lib/services/service.dart.twig',
             ],
             [
-                'scope'         => 'definition',
-                'destination'   => '/lib/src/models/{{definition.name | caseSnake }}.dart',
-                'template'      => 'dart/lib/src/models/model.dart.twig',
+                'scope' => 'definition',
+                'destination' => '/lib/src/models/{{definition.name | caseSnake }}.dart',
+                'template' => 'dart/lib/src/models/model.dart.twig',
             ],
             [
-                'scope'         => 'requestModel',
-                'destination'   => '/lib/src/models/{{requestModel.name | caseSnake }}.dart',
-                'template'      => 'dart/lib/src/models/request_model.dart.twig',
+                'scope' => 'requestModel',
+                'destination' => '/lib/src/models/{{requestModel.name | caseSnake }}.dart',
+                'template' => 'dart/lib/src/models/request_model.dart.twig',
             ],
             [
-                'scope'         => 'method',
-                'destination'   => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
-                'template'      => 'dart/docs/example.md.twig',
+                'scope' => 'method',
+                'destination' => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
+                'template' => 'dart/docs/example.md.twig',
             ],
             [
-                'scope'         => 'service',
-                'destination'   => '/test/services/{{service.name | caseSnake}}_test.dart',
-                'template'      => 'dart/test/services/service_test.dart.twig',
+                'scope' => 'service',
+                'destination' => '/test/services/{{service.name | caseSnake}}_test.dart',
+                'template' => 'dart/test/services/service_test.dart.twig',
             ],
             [
-                'scope'         => 'definition',
-                'destination'   => '/test/src/models/{{definition.name | caseSnake }}_test.dart',
-                'template'      => 'dart/test/src/models/model_test.dart.twig',
+                'scope' => 'definition',
+                'destination' => '/test/src/models/{{definition.name | caseSnake }}_test.dart',
+                'template' => 'dart/test/src/models/model_test.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/test/id_test.dart',
-                'template'      => 'dart/test/id_test.dart.twig',
+                'scope' => 'default',
+                'destination' => '/test/id_test.dart',
+                'template' => 'dart/test/id_test.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/test/permission_test.dart',
-                'template'      => 'dart/test/permission_test.dart.twig',
+                'scope' => 'default',
+                'destination' => '/test/permission_test.dart',
+                'template' => 'dart/test/permission_test.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/test/query_test.dart',
-                'template'      => 'dart/test/query_test.dart.twig',
+                'scope' => 'default',
+                'destination' => '/test/query_test.dart',
+                'template' => 'dart/test/query_test.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/test/operator_test.dart',
-                'template'      => 'dart/test/operator_test.dart.twig',
+                'scope' => 'default',
+                'destination' => '/test/operator_test.dart',
+                'template' => 'dart/test/operator_test.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/test/role_test.dart',
-                'template'      => 'dart/test/role_test.dart.twig',
+                'scope' => 'default',
+                'destination' => '/test/role_test.dart',
+                'template' => 'dart/test/role_test.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/test/src/enums_test.dart',
-                'template'      => 'dart/test/src/enums_test.dart.twig',
+                'scope' => 'default',
+                'destination' => '/test/src/enums_test.dart',
+                'template' => 'dart/test/src/enums_test.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/test/src/upload_progress_test.dart',
-                'template'      => 'dart/test/src/upload_progress_test.dart.twig',
+                'scope' => 'default',
+                'destination' => '/test/src/upload_progress_test.dart',
+                'template' => 'dart/test/src/upload_progress_test.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/test/src/exception_test.dart',
-                'template'      => 'dart/test/src/exception_test.dart.twig',
+                'scope' => 'default',
+                'destination' => '/test/src/exception_test.dart',
+                'template' => 'dart/test/src/exception_test.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/test/src/input_file_test.dart',
-                'template'      => 'dart/test/src/input_file_test.dart.twig',
+                'scope' => 'default',
+                'destination' => '/test/src/input_file_test.dart',
+                'template' => 'dart/test/src/input_file_test.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '/test/src/response_test.dart',
-                'template'      => 'dart/test/src/response_test.dart.twig',
+                'scope' => 'default',
+                'destination' => '/test/src/response_test.dart',
+                'template' => 'dart/test/src/response_test.dart.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '.github/workflows/publish.yml',
-                'template'      => 'dart/.github/workflows/publish.yml.twig',
+                'scope' => 'default',
+                'destination' => '.github/workflows/publish.yml',
+                'template' => 'dart/.github/workflows/publish.yml.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '.github/workflows/format.yml',
-                'template'      => 'dart/.github/workflows/format.yml.twig',
+                'scope' => 'default',
+                'destination' => '.github/workflows/format.yml',
+                'template' => 'dart/.github/workflows/format.yml.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '.github/workflows/test.yml',
-                'template'      => 'dart/.github/workflows/test.yml',
+                'scope' => 'default',
+                'destination' => '.github/workflows/test.yml',
+                'template' => 'dart/.github/workflows/test.yml',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'lib/src/input_file.dart',
-                'template'      => 'dart/lib/src/input_file.dart.twig',
+                'scope' => 'default',
+                'destination' => 'lib/src/input_file.dart',
+                'template' => 'dart/lib/src/input_file.dart.twig',
             ],
             [
-                'scope'         => 'enum',
-                'destination'   => 'lib/src/enums/{{ enum.name | caseSnake }}.dart',
-                'template'      => 'dart/lib/src/enums/enum.dart.twig',
+                'scope' => 'enum',
+                'destination' => 'lib/src/enums/{{ enum.name | caseSnake }}.dart',
+                'template' => 'dart/lib/src/enums/enum.dart.twig',
             ],
         ];
     }
 
+    #[Override]
     public function getFilters(): array
     {
         return [
-            new TwigFilter('dartComment', function ($value) {
-                $value = explode("\n", $value);
-                foreach ($value as $key => $line) {
-                    $value[$key] = "  /// " . wordwrap($value[$key], 75, "\n  /// ");
-                }
-                return implode("\n", $value);
-            }, ['is_safe' => ['html']]),
-            new TwigFilter('caseEnumKey', function (string $value) {
-                return $this->toCamelCase($value);
-            }),
-            new TwigFilter('enumExample', function (array $param) {
+            new TwigFilter('caseEnumKey', fn(string $value): string => $this->toCamelCase($value)),
+            new TwigFilter('enumExample', function (array $param): string {
                 $enumValues = $param['enumValues'] ?? [];
                 if (empty($enumValues)) {
                     return '';
@@ -585,7 +559,7 @@ class Dart extends Language
                 $example = $param['example'] ?? null;
                 $isArray = ($param['type'] ?? '') === self::TYPE_ARRAY;
 
-                $resolveKey = function ($value) use ($enumValues, $enumKeys) {
+                $resolveKey = function ($value) use ($enumValues, $enumKeys): string {
                     $index = array_search($value, $enumValues, true);
                     if ($index !== false && isset($enumKeys[$index]) && $enumKeys[$index] !== '') {
                         return $this->toCamelCase($enumKeys[$index]);
@@ -594,7 +568,7 @@ class Dart extends Language
                         return $this->toCamelCase($enumValues[$index]);
                     }
                     $fallback = $enumKeys[0] ?? $enumValues[0] ?? $value;
-                    return $this->toCamelCase((string)$fallback);
+                    return $this->toCamelCase((string) $fallback);
                 };
 
                 if ($isArray) {
@@ -608,13 +582,11 @@ class Dart extends Language
                         $values = $example;
                     }
 
-                    if (empty($values)) {
+                    if ($values === []) {
                         $values = [$enumValues[0]];
                     }
 
-                    $items = array_map(function ($value) use ($enumName, $resolveKey) {
-                        return 'enums.' . \ucfirst($enumName) . '.' . $resolveKey($value);
-                    }, $values);
+                    $items = array_map(fn($value): string => 'enums.' . \ucfirst($enumName) . '.' . $resolveKey($value), $values);
 
                     return '[' . implode(', ', $items) . ']';
                 }
@@ -622,9 +594,7 @@ class Dart extends Language
                 $value = ($example !== null && $example !== '') ? $example : $enumValues[0];
                 return 'enums.' . \ucfirst($enumName) . '.' . $resolveKey($value);
             }),
-            new TwigFilter('modelToMapValue', function (array $property) {
-                return $this->getModelToMapValue($property);
-            }, ['is_safe' => ['html']]),
+            new TwigFilter('modelToMapValue', fn(array $property): string => $this->getModelToMapValue($property), ['is_safe' => ['html']]),
         ];
     }
 }

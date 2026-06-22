@@ -5,6 +5,8 @@ import {
   Databases,
   Functions,
   Messaging,
+  Oauth2,
+  Organization,
   Organizations,
   Project,
   Projects,
@@ -36,11 +38,23 @@ export const getMessagingService = async (sdk?: Client): Promise<Messaging> => {
   return new Messaging(client);
 };
 
+export const getOauth2Service = async (sdk?: Client): Promise<Oauth2> => {
+  const client = !sdk ? await sdkForConsole() : sdk;
+  return new Oauth2(client);
+};
+
 export const getOrganizationsService = async (
   sdk?: Client,
 ): Promise<Organizations> => {
   const client = !sdk ? await sdkForProject() : sdk;
   return new Organizations(client);
+};
+
+export const getOrganizationService = async (
+  sdk?: Client,
+): Promise<Organization> => {
+  const client = !sdk ? await sdkForConsole() : sdk;
+  return new Organization(client);
 };
 
 export const getProjectService = async (sdk?: Client): Promise<Project> => {

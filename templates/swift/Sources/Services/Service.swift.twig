@@ -11,7 +11,7 @@ open class {{ service.name | caseUcfirst | overrideIdentifier }}: Service {
     {%~ for method in service.methods %}
     ///
     {%~ if method.description %}
-    {{~ method.description | swiftComment }}
+    {{~ method.description | wrap(75, '    /// ') }}
     ///
     {%~ endif %}
     {%~ if method.parameters.all | length > 0 %}
@@ -44,12 +44,16 @@ open class {{ service.name | caseUcfirst | overrideIdentifier }}: Service {
         {%~ endif %}
     ) async throws -> {{ method | returnType(spec) | raw }} {
         {{~ include('swift/base/params.twig') }}
-        {%~ if method.headers | length <= 0 %}
+        {%~ if method.headers | length <= 0 and method.securityHeaders | length <= 0 %}
         let apiHeaders: [String: String] = [:]
         {%~ else %}
         {% if 'multipart/form-data' in method.consumes -%} var
         {%- else -%} let
         {%- endif %} apiHeaders: [String: String] = [
+        {%~ for key, security in method.securityHeaders %}
+            "{{ security.name }}": client.config["{{ key | caseCamel }}"] ?? ""{% if not loop.last or method.headers | length > 0 %},{% endif %}
+
+        {%~ endfor %}
         {%~ for key, header in method.headers %}
             "{{ key }}": "{{ header }}"{% if not loop.last %},{% endif %}
 
@@ -99,7 +103,7 @@ open class {{ service.name | caseUcfirst | overrideIdentifier }}: Service {
 
     ///
     {%~ if method.description %}
-    {{~ method.description | swiftComment }}
+    {{~ method.description | wrap(75, '    /// ') }}
     ///
     {%~ endif %}
     {%~ if method.parameters.all | length > 0 %}

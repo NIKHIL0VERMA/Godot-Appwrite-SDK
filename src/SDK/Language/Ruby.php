@@ -2,17 +2,18 @@
 
 namespace Appwrite\SDK\Language;
 
+use Override;
 use Appwrite\SDK\Language;
 use Twig\TwigFilter;
 
 class Ruby extends Language
 {
+    #[Override]
     protected $params = [
         'gemPackage' => 'gemName',
     ];
 
     /**
-     * @param string $name
      * @return $this
      */
     public function setGemPackage(string $name): self
@@ -22,9 +23,6 @@ class Ruby extends Language
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'Ruby';
@@ -32,8 +30,6 @@ class Ruby extends Language
 
     /**
      * Get Language Keywords List
-     *
-     * @return array
      */
     public function getKeywords(): array
     {
@@ -78,9 +74,6 @@ class Ruby extends Language
         ];
     }
 
-    /**
-     * @return array
-     */
     public function getIdentifierOverrides(): array
     {
         return [];
@@ -101,124 +94,119 @@ class Ruby extends Language
         return '[' . $elements . ']';
     }
 
-    /**
-     * @return array
-     */
     public function getFiles(): array
     {
         return [
             [
-                'scope'         => 'default',
-                'destination'   => 'README.md',
-                'template'      => 'ruby/README.md.twig',
+                'scope' => 'default',
+                'destination' => 'README.md',
+                'template' => 'ruby/README.md.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'CHANGELOG.md',
-                'template'      => 'ruby/CHANGELOG.md.twig',
+                'scope' => 'default',
+                'destination' => 'CHANGELOG.md',
+                'template' => 'ruby/CHANGELOG.md.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'LICENSE',
-                'template'      => 'ruby/LICENSE.twig',
+                'scope' => 'default',
+                'destination' => 'LICENSE',
+                'template' => 'ruby/LICENSE.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'Gemfile',
-                'template'      => 'ruby/Gemfile.twig',
+                'scope' => 'default',
+                'destination' => 'Gemfile',
+                'template' => 'ruby/Gemfile.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '{{ spec.title | caseDash }}.gemspec',
-                'template'      => 'ruby/gemspec.twig',
+                'scope' => 'default',
+                'destination' => '{{ spec.title | caseDash }}.gemspec',
+                'template' => 'ruby/gemspec.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'lib/{{ spec.title | caseDash }}.rb',
-                'template'      => 'ruby/lib/container.rb.twig',
+                'scope' => 'default',
+                'destination' => 'lib/{{ spec.title | caseDash }}.rb',
+                'template' => 'ruby/lib/container.rb.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'lib/{{ spec.title | caseDash }}/client.rb',
-                'template'      => 'ruby/lib/container/client.rb.twig',
+                'scope' => 'default',
+                'destination' => 'lib/{{ spec.title | caseDash }}/client.rb',
+                'template' => 'ruby/lib/container/client.rb.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'lib/{{ spec.title | caseDash }}/permission.rb',
-                'template'      => 'ruby/lib/container/permission.rb.twig',
+                'scope' => 'default',
+                'destination' => 'lib/{{ spec.title | caseDash }}/permission.rb',
+                'template' => 'ruby/lib/container/permission.rb.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'lib/{{ spec.title | caseDash }}/role.rb',
-                'template'      => 'ruby/lib/container/role.rb.twig',
+                'scope' => 'default',
+                'destination' => 'lib/{{ spec.title | caseDash }}/role.rb',
+                'template' => 'ruby/lib/container/role.rb.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'lib/{{ spec.title | caseDash }}/id.rb',
-                'template'      => 'ruby/lib/container/id.rb.twig',
+                'scope' => 'default',
+                'destination' => 'lib/{{ spec.title | caseDash }}/id.rb',
+                'template' => 'ruby/lib/container/id.rb.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'lib/{{ spec.title | caseDash }}/query.rb',
-                'template'      => 'ruby/lib/container/query.rb.twig',
+                'scope' => 'default',
+                'destination' => 'lib/{{ spec.title | caseDash }}/query.rb',
+                'template' => 'ruby/lib/container/query.rb.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'lib/{{ spec.title | caseDash }}/operator.rb',
-                'template'      => 'ruby/lib/container/operator.rb.twig',
+                'scope' => 'default',
+                'destination' => 'lib/{{ spec.title | caseDash }}/operator.rb',
+                'template' => 'ruby/lib/container/operator.rb.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'lib/{{ spec.title | caseDash }}/service.rb',
-                'template'      => 'ruby/lib/container/service.rb.twig',
+                'scope' => 'default',
+                'destination' => 'lib/{{ spec.title | caseDash }}/service.rb',
+                'template' => 'ruby/lib/container/service.rb.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'lib/{{ spec.title | caseDash }}/input_file.rb',
-                'template'      => 'ruby/lib/container/input_file.rb.twig',
+                'scope' => 'default',
+                'destination' => 'lib/{{ spec.title | caseDash }}/input_file.rb',
+                'template' => 'ruby/lib/container/input_file.rb.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => 'lib/{{ spec.title | caseDash }}/exception.rb',
-                'template'      => 'ruby/lib/container/exception.rb.twig',
+                'scope' => 'default',
+                'destination' => 'lib/{{ spec.title | caseDash }}/exception.rb',
+                'template' => 'ruby/lib/container/exception.rb.twig',
             ],
             [
-                'scope'         => 'service',
-                'destination'   => '/lib/{{ spec.title | caseDash}}/services/{{service.name | caseSnake}}.rb',
-                'template'      => 'ruby/lib/container/services/service.rb.twig',
+                'scope' => 'service',
+                'destination' => '/lib/{{ spec.title | caseDash}}/services/{{service.name | caseSnake}}.rb',
+                'template' => 'ruby/lib/container/services/service.rb.twig',
             ],
             [
-                'scope'         => 'method',
-                'destination'   => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
-                'template'      => 'ruby/docs/example.md.twig',
+                'scope' => 'method',
+                'destination' => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
+                'template' => 'ruby/docs/example.md.twig',
             ],
             [
-                'scope'         => 'default',
-                'destination'   => '.github/workflows/publish.yml',
-                'template'      => 'ruby/.github/workflows/publish.yml.twig',
+                'scope' => 'default',
+                'destination' => '.github/workflows/publish.yml',
+                'template' => 'ruby/.github/workflows/publish.yml.twig',
             ],
             [
-                'scope'         => 'definition',
-                'destination'   => '/lib/{{ spec.title | caseDash }}/models/{{ definition.name | caseSnake }}.rb',
-                'template'      => 'ruby/lib/container/models/model.rb.twig',
+                'scope' => 'definition',
+                'destination' => '/lib/{{ spec.title | caseDash }}/models/{{ definition.name | caseSnake }}.rb',
+                'template' => 'ruby/lib/container/models/model.rb.twig',
             ],
             [
-                'scope'         => 'requestModel',
-                'destination'   => '/lib/{{ spec.title | caseDash }}/models/{{ requestModel.name | caseSnake }}.rb',
-                'template'      => 'ruby/lib/container/models/request_model.rb.twig',
+                'scope' => 'requestModel',
+                'destination' => '/lib/{{ spec.title | caseDash }}/models/{{ requestModel.name | caseSnake }}.rb',
+                'template' => 'ruby/lib/container/models/request_model.rb.twig',
             ],
             [
-                'scope'         => 'enum',
-                'destination'   => 'lib/{{ spec.title | caseSnake}}/enums/{{ enum.name | caseSnake }}.rb',
-                'template'      => 'ruby/lib/container/enums/enum.rb.twig',
+                'scope' => 'enum',
+                'destination' => 'lib/{{ spec.title | caseSnake}}/enums/{{ enum.name | caseSnake }}.rb',
+                'template' => 'ruby/lib/container/enums/enum.rb.twig',
             ],
         ];
     }
 
     /**
-     * @param array $parameter
      * @param array $nestedTypes
-     * @return string
      */
     public function getTypeName(array $parameter, array $spec = []): string
     {
@@ -233,7 +221,7 @@ class Ruby extends Language
             return \ucfirst($parameter['enumName']);
         }
         if (!empty($parameter['enumValues'])) {
-            return \ucfirst($parameter['name']);
+            return \ucfirst((string) $parameter['name']);
         }
         if (!empty($parameter['array']['model'])) {
             return 'Array';
@@ -252,15 +240,11 @@ class Ruby extends Language
         };
     }
 
-    /**
-     * @param array $param
-     * @return string
-     */
     public function getParamDefault(array $param): string
     {
-        $type       = $param['type'] ?? '';
-        $default    = $param['default'] ?? '';
-        $required   = $param['required'] ?? '';
+        $type = $param['type'] ?? '';
+        $default = $param['default'] ?? '';
+        $required = $param['required'] ?? '';
 
         if ($required) {
             return ':';
@@ -313,8 +297,8 @@ class Ruby extends Language
      */
     public function getParamExample(array $param, string $lang = '', array $spec = []): string
     {
-        $type       = $param['type'] ?? '';
-        $example    = $param['example'] ?? '';
+        $type = $param['type'] ?? '';
+        $example = $param['example'] ?? '';
 
         $output = '';
 
@@ -348,7 +332,7 @@ class Ruby extends Language
                     $output .= $this->isPermissionString($example) ? $this->getPermissionExample($example) : $example;
                     break;
                 case self::TYPE_OBJECT:
-                    $output .= $this->jsonToHash(json_decode($example, true));
+                    $output .= $this->jsonToHash(json_decode((string) $example, true));
                     break;
                 case self::TYPE_BOOLEAN:
                     $output .= ($example) ? 'true' : 'false';
@@ -368,12 +352,11 @@ class Ruby extends Language
     /**
      * Converts JSON Object To Ruby Native Hash
      *
-     * @return string
      * @var $data array
      */
     protected function jsonToHash(array $data, int $indent = 0): string
     {
-        if (empty($data)) {
+        if ($data === []) {
             return '{}';
         }
 
@@ -402,25 +385,15 @@ class Ruby extends Language
             $output .= "\n";
         }
 
-        $output .= str_repeat('  ', $indent + 2) . '}';
-
-        return $output;
+        return $output . (str_repeat('  ', $indent + 2) . '}');
     }
 
+    #[Override]
     public function getFilters(): array
     {
         return [
-            new TwigFilter('rubyComment', function ($value) {
-                $value = explode("\n", $value);
-                foreach ($value as $key => $line) {
-                    $value[$key] = "        # " . wordwrap($line, 75, "\n        # ");
-                }
-                return implode("\n", $value);
-            }, ['is_safe' => ['html']]),
-            new TwigFilter('caseEnumKey', function (string $value) {
-                return $this->toUpperSnakeCase($value);
-            }),
-            new TwigFilter('enumExample', function (array $param) {
+            new TwigFilter('caseEnumKey', fn(string $value): string => $this->toUpperSnakeCase($value)),
+            new TwigFilter('enumExample', function (array $param): string {
                 $enumValues = $param['enumValues'] ?? [];
                 if (empty($enumValues)) {
                     return '';
@@ -431,7 +404,7 @@ class Ruby extends Language
                 $example = $param['example'] ?? null;
                 $isArray = ($param['type'] ?? '') === self::TYPE_ARRAY;
 
-                $resolveKey = function ($value) use ($enumValues, $enumKeys) {
+                $resolveKey = function ($value) use ($enumValues, $enumKeys): string {
                     $index = array_search($value, $enumValues, true);
                     if ($index !== false && isset($enumKeys[$index]) && $enumKeys[$index] !== '') {
                         return $this->toUpperSnakeCase($enumKeys[$index]);
@@ -440,7 +413,7 @@ class Ruby extends Language
                         return $this->toUpperSnakeCase($enumValues[$index]);
                     }
                     $fallback = $enumKeys[0] ?? $enumValues[0] ?? $value;
-                    return $this->toUpperSnakeCase((string)$fallback);
+                    return $this->toUpperSnakeCase((string) $fallback);
                 };
 
                 if ($isArray) {
@@ -454,13 +427,11 @@ class Ruby extends Language
                         $values = $example;
                     }
 
-                    if (empty($values)) {
+                    if ($values === []) {
                         $values = [$enumValues[0]];
                     }
 
-                    $items = array_map(function ($value) use ($enumName, $resolveKey) {
-                        return $enumName . '::' . $resolveKey($value);
-                    }, $values);
+                    $items = array_map(fn($value): string => $enumName . '::' . $resolveKey($value), $values);
 
                     return '[' . implode(', ', $items) . ']';
                 }

@@ -1,5 +1,4 @@
-import { fetch, FormData, File } from 'node-fetch-native-with-agent';
-import { createAgent } from 'node-fetch-native-with-agent/agent';
+import { fetch, FormData, File, Agent, type RequestInit } from 'undici';
 import { Models } from './models';
 import { InputFile } from './inputFile';
 import JSONbigModule from 'json-bigint';
@@ -108,6 +107,7 @@ function getUserAgent() {
 
 class Client {
     static CHUNK_SIZE = 1024 * 1024 * 5;
+    private selfSignedAgent?: Agent;
 
     config = {
         endpoint: '{{ spec.endpoint }}',
@@ -164,6 +164,11 @@ class Client {
 
         this.config.selfSigned = selfSigned;
 
+        if (!selfSigned && this.selfSignedAgent) {
+            this.selfSignedAgent.destroy();
+            this.selfSignedAgent = undefined;
+        }
+
         return this;
     }
 
@@ -206,7 +211,9 @@ class Client {
      * @return {this}
      */
     set{{header.key | caseUcfirst}}(value: string): this {
-        this.headers['{{header.name}}'] = value;
+        {%~ if header.global %}
+        this.headers['{{ header.name }}'] = value;
+        {%~ endif %}
         this.config.{{ header.key | caseLower }} = value;
         return this;
     }
@@ -220,8 +227,18 @@ class Client {
         let options: RequestInit = {
             method,
             headers,
-            ...createAgent(this.config.endpoint, { rejectUnauthorized: !this.config.selfSigned }),
         };
+
+        if (this.config.selfSigned) {
+            if (!this.selfSignedAgent) {
+                this.selfSignedAgent = new Agent({
+                    connect: {
+                        rejectUnauthorized: false,
+                    },
+                });
+            }
+            options.dispatcher = this.selfSignedAgent;
+        }
 
         if (method === 'GET') {
             for (const [key, value] of Object.entries(Client.flatten(params))) {
@@ -503,9 +520,20 @@ class Client {
         return finalResponse ?? lastResponse;
     }
 
-    async ping(): Promise<unknown> {
-        return this.call('GET', new URL(this.config.endpoint + '/ping'));
+    {%~ for clientMethodName, clientMethods in spec.clientMethods %}
+    {%~ for clientMethod in clientMethods %}
+    async {{ clientMethodName | caseCamel }}(): Promise<unknown> {
+        return this.call('{{ clientMethod.method | caseUpper }}', new URL(this.config.endpoint + '{{ clientMethod.path }}'), {
+            {%~ for key, security in clientMethod.securityHeaders %}
+            '{{ security.name }}': this.config.{{ key | caseLower }},
+            {%~ endfor %}
+            {%~ for key, header in clientMethod.headers %}
+            '{{ key }}': '{{ header }}',
+            {%~ endfor %}
+        });
     }
+    {%~ endfor %}
+    {%~ endfor %}
 
     async redirect(method: string, url: URL, headers: Headers = {}, params: Payload = {}): Promise<string> {
         const { uri, options } = this.prepareRequest(method, url, headers, params);

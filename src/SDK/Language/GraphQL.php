@@ -4,9 +4,6 @@ namespace Appwrite\SDK\Language;
 
 class GraphQL extends HTTP
 {
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'GraphQL';
@@ -29,7 +26,6 @@ class GraphQL extends HTTP
 
     /**
      * @param $type
-     * @return string
      */
     public function getTypeName(array $parameter, array $spec = []): string
     {
@@ -71,15 +67,11 @@ class GraphQL extends HTTP
         return $type;
     }
 
-    /**
-     * @param array $param
-     * @return string
-     */
     public function getParamDefault(array $param): string
     {
-        $type       = $param['type'] ?? '';
-        $default    = $param['default'] ?? '';
-        $required   = $param['required'] ?? '';
+        $type = $param['type'] ?? '';
+        $default = $param['default'] ?? '';
+        $required = $param['required'] ?? '';
 
         if ($required) {
             return '';
@@ -134,8 +126,8 @@ class GraphQL extends HTTP
      */
     public function getParamExample(array $param, string $lang = '', array $spec = []): string
     {
-        $type       = $param['type'] ?? '';
-        $example    = $param['example'] ?? '';
+        $type = $param['type'] ?? '';
+        $example = $param['example'] ?? '';
 
         $hasExample = !empty($example) || $example === 0 || $example === false;
 
@@ -154,25 +146,22 @@ class GraphQL extends HTTP
             self::TYPE_ARRAY, self::TYPE_FILE, self::TYPE_INTEGER, self::TYPE_NUMBER => $example,
             self::TYPE_BOOLEAN => ($example) ? 'true' : 'false',
             self::TYPE_OBJECT => ($example === '{}')
-                ? '"{}"'
-                : '"' . str_replace('"', '\\"', json_encode(json_decode($example, true))) . '"',
+            ? '"{}"'
+            : '"' . str_replace('"', '\\"', json_encode(json_decode((string) $example, true))) . '"',
             self::TYPE_STRING => '"' . $example . '"',
         };
     }
 
-    /**
-     * @return array
-     */
     public function getFiles(): array
     {
         return [
             [
-                'scope'         => 'method',
-                'destination'   => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
-                'template'      => '/graphql/docs/example.md.twig',
-                'exclude'       => [
-                    'services'  => [['name' => 'graphql']],
-                    'methods'   => [['type' => 'webAuth']],
+                'scope' => 'method',
+                'destination' => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
+                'template' => '/graphql/docs/example.md.twig',
+                'exclude' => [
+                    'services' => [['name' => 'graphql']],
+                    'methods' => [['type' => 'webAuth']],
                 ],
             ],
         ];
