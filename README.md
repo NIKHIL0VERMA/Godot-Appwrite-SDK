@@ -1,15 +1,57 @@
-# ⚙️ Appwrite SDK Generator
+# ⚙️ Appwrite SDK Generator for Godot 
 
-[![Discord](https://img.shields.io/discord/564160730845151244?label=discord&style=flat-square)](https://appwrite.io/discord)
-[![CI](https://github.com/appwrite/sdk-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/appwrite/sdk-generator/actions/workflows/ci.yml)
-[![X Account](https://img.shields.io/badge/follow-@appwrite-000000?style=flat-square&logo=x&logoColor=white)](https://x.com/appwrite)
-[![appwrite.io](https://img.shields.io/badge/appwrite-.io-f02e65?style=flat-square)](https://appwrite.io)
+> [!NOTE]
+> This repository is a community-maintained fork of Appwrite's SDK Generator.
+> 
+> Upstream project: https://github.com/appwrite/sdk-generator
+>
+> It adds support for:
+> - Godot 4.x Client SDK generation
+> - GDScript Server SDK generation
+>
+> The original SDK Generator architecture, specifications, and language implementations are maintained by the Appwrite project and its contributors.
 
-[Appwrite](https://appwrite.io) SDK generator is a PHP library for auto-generating SDK libraries for multiple languages and platforms.
+## Godot Support
 
-The SDK Generator uses predefined language settings as [Twig templates](https://twig.symfony.com/) to generate codebases based on different API specs.
+This fork introduces two new generation targets:
 
-Both OpenAPI 3.0 and Swagger 2.0 specs are supported and produce identical SDKs, including services, methods, models, enums, and union types.
+| Target | Purpose |
+|----------|----------|
+| Godot | Client SDK for Godot 4.x games |
+| GDScript | SDK for headless Godot server and multiplayer applications |
+
+Generated SDKs support:
+
+- Authentication
+- Databases
+- Storage
+- Realtime
+- Functions
+- Teams
+- Messaging
+- Avatars
+
+and other Appwrite services exposed through the OpenAPI specification.
+
+## Project Status
+
+This project is community-maintained.
+
+The Godot and GDScript generators are developed independently from the Appwrite core SDK roadmap.
+
+This fork tracks upstream Appwrite SDK Generator changes when possible while focusing on Godot ecosystem support.
+
+## Repository Purpose
+
+This repository exists to maintain and evolve Appwrite SDK support for the Godot ecosystem.
+
+Primary goals:
+
+- Generate Godot 4.x client SDKs
+- Generate GDScript server/headless SDKs
+- Publish ready-to-use SDK releases
+- Support Godot Asset Library distribution
+- Track Appwrite API updates
 
 ## Getting Started
 
@@ -202,10 +244,19 @@ php example.php agent-skills
 
 ## Contributing
 
-All code contributions, including those by people with commit access, must go through a pull request and be approved by a core developer before being merged. This is to ensure proper review of all the code.
+Pull requests are welcome.
 
-We truly ❤️ pull requests! If you wish to help, you can learn more about how you can contribute to this project in the [contribution guide](CONTRIBUTING.md).
+Contributors are encouraged to discuss major architectural or generator changes before implementation.
 
-## Copyright and license
+This repository follows a review-first workflow to maintain compatibility with upstream Appwrite SDK Generator behavior whenever possible.
 
-The MIT License (MIT) http://www.opensource.org/licenses/mit-license.php
+## Copyright and License
+
+This project is licensed under the MIT License.
+
+This repository is derived from Appwrite SDK Generator and retains the original MIT license and attribution.
+
+Original project:
+https://github.com/appwrite/sdk-generator
+
+Godot and GDScript platform support, templates, tests, and related tooling are maintained by Nikhil Verma and community contributors.

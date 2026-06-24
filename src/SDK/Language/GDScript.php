@@ -169,11 +169,6 @@ class GDScript extends Language
         return [
             [
                 'scope' => 'default',
-                'destination' => 'CHANGELOG.md',
-                'template' => 'gdscript/CHANGELOG.md.twig',
-            ],
-            [
-                'scope' => 'default',
                 'destination' => 'LICENSE',
                 'template' => 'gdscript/LICENSE.twig',
             ],

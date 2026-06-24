@@ -22,11 +22,6 @@ class Godot extends GDScript
         return [
             [
                 'scope' => 'default',
-                'destination' => 'CHANGELOG.md',
-                'template' => 'godot/CHANGELOG.md.twig',
-            ],
-            [
-                'scope' => 'default',
                 'destination' => 'LICENSE',
                 'template' => 'godot/LICENSE.twig',
             ],
