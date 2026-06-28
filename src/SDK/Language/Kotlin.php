@@ -206,15 +206,12 @@ class Kotlin extends Language
     }
 
     /**
-<<<<<<< HEAD
-     * @param array $param
-     * @param string $lang
-     * @param array $spec
-     * @return string
-=======
-     * @param string $lang Language variant: 'kotlin' (default) or 'java'
->>>>>>> upstream/main
-     */
+    <<<<<<< HEAD
+    * @return string
+    =======
+    * @param string $lang Language variant: 'kotlin' (default) or 'java'
+    >>>>>>> upstream/main
+    */
     public function getParamExample(array $param, string $lang = '', array $spec = []): string
     {
         $type       = $param['type'] ?? '';

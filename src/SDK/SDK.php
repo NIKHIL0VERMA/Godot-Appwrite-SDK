@@ -15,9 +15,7 @@ use Twig\Extension\DebugExtension;
 use Twig\Loader\FilesystemLoader;
 use Twig\TemplateWrapper;
 use Twig\TwigFilter;
-use MatthiasMullie\Minify;
 use Twig_Error_Loader;
-use Twig_Error_Runtime;
 use Twig_Error_Syntax;
 
 class SDK

@@ -1,8 +1,12 @@
 <?php
 
-namespace Tests;
+declare(strict_types=1);
 
-class GDScript4Test extends Base
+namespace Tests\E2E;
+
+use Appwrite\SDK\Language\GDScript;
+
+final class GDScript4Test extends Base
 {
     protected string $sdkName = 'gdscript';
     protected string $sdkPlatform = 'server';
@@ -10,7 +14,7 @@ class GDScript4Test extends Base
     protected string $version = '0.0.1';
 
     protected string $language = 'gdscript';
-    protected string $class = 'Appwrite\SDK\Language\GDScript';
+    protected string $class = GDScript::class;
     protected array $build = [
         'cp tests/languages/gdscript/test.gd tests/sdks/gdscript/test.gd',
         'cp -r tests/resources tests/sdks/gdscript/tests/',

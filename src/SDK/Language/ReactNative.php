@@ -3,7 +3,6 @@
 namespace Appwrite\SDK\Language;
 
 use Override;
-use Twig\TwigFilter;
 
 class ReactNative extends Web
 {
@@ -160,12 +159,7 @@ class ReactNative extends Web
         return parent::getTypeName($parameter, $method);
     }
 
-    /**
-     * @param array $param
-     * @param string $lang
-     * @param array $spec
-     * @return string
-     */
+    #[Override]
     public function getParamExample(array $param, string $lang = '', array $spec = []): string
     {
         $type = $param['type'] ?? '';

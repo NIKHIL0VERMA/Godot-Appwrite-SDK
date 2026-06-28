@@ -1,22 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Appwrite\SDK\Language;
 
+use Override;
 use Appwrite\SDK\Language\GDScript;
 
 class Godot extends GDScript
 {
-    /**
-     * @return string
-     */
+    #[Override]
     public function getName(): string
     {
         return 'Godot';
     }
 
-    /**
-     * @return array
-     */
+    #[Override]
     public function getFiles(): array
     {
         return [

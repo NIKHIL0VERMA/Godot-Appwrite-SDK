@@ -2,14 +2,12 @@
 
 namespace Appwrite\SDK\Language;
 
+use Override;
 use Appwrite\SDK\Language;
 use Twig\TwigFilter;
 
 class GDScript extends Language
 {
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return 'GDScript';
@@ -17,8 +15,6 @@ class GDScript extends Language
 
     /**
      * Get Language Keywords List
-     *
-     * @return array
      */
     public function getKeywords(): array
     {
@@ -138,9 +134,6 @@ class GDScript extends Language
         ];
     }
 
-    /**
-     * @return array
-     */
     public function getIdentifierOverrides(): array
     {
         return [];
@@ -161,9 +154,6 @@ class GDScript extends Language
         return '[' . $elements . ']';
     }
 
-    /**
-     * @return array
-     */
     public function getFiles(): array
     {
         return [
@@ -315,11 +305,6 @@ class GDScript extends Language
         ];
     }
 
-    /**
-     * @param array $parameter
-     * @param array $spec
-     * @return string
-     */
     public function getTypeName(array $parameter, array $spec = []): string
     {
         $prefix = $this->toPascalCase($spec['title'] ?? '');
@@ -370,10 +355,6 @@ class GDScript extends Language
         };
     }
 
-    /**
-     * @param array $param
-     * @return string
-     */
     public function getParamDefault(array $param): string
     {
         $type = $param['type'] ?? '';
@@ -387,29 +368,15 @@ class GDScript extends Language
         $output = ' = ';
 
         if (empty($default) && $default !== 0 && $default !== false) {
-            switch ($type) {
-                case self::TYPE_NUMBER:
-                    $output .= '0.0';
-                    break;
-                case self::TYPE_INTEGER:
-                    $output .= '0';
-                    break;
-                case self::TYPE_BOOLEAN:
-                    $output .= 'false';
-                    break;
-                case self::TYPE_STRING:
-                    $output .= "''";
-                    break;
-                case self::TYPE_ARRAY:
-                    $output .= '[]';
-                    break;
-                case self::TYPE_OBJECT:
-                    $output .= '{}';
-                    break;
-                default:
-                    $output .= 'null';
-                    break;
-            }
+            match ($type) {
+                self::TYPE_NUMBER => $output .= '0.0',
+                self::TYPE_INTEGER => $output .= '0',
+                self::TYPE_BOOLEAN => $output .= 'false',
+                self::TYPE_STRING => $output .= "''",
+                self::TYPE_ARRAY => $output .= '[]',
+                self::TYPE_OBJECT => $output .= '{}',
+                default => $output .= 'null',
+            };
         } else {
             switch ($type) {
                 case self::TYPE_NUMBER:
@@ -443,12 +410,6 @@ class GDScript extends Language
         return $output;
     }
 
-    /**
-     * @param array $param
-     * @param string $lang
-     * @param array $spec
-     * @return string
-     */
     public function getParamExample(array $param, string $lang = '', array $spec = []): string
     {
         $type = $param['type'] ?? '';
@@ -504,22 +465,18 @@ class GDScript extends Language
         return $output;
     }
 
+    #[Override]
     public function getFilters(): array
     {
         return array_merge([
-            new TwigFilter('caseEnumKey', function (string $value) {
-                return $this->toUpperSnakeCase($value);
-            }),
-            new TwigFilter('uniqueSnake', function (string $value) {
-                return $this->toUniqueSnake($value);
-            }),
+            new TwigFilter('caseEnumKey', fn(string $value): string => $this->toUpperSnakeCase($value)),
+            new TwigFilter('uniqueSnake', fn(string $value): string => $this->toUniqueSnake($value)),
         ], parent::getFilters());
     }
 
     private function toUniqueSnake(string $value): string
     {
         $base = $this->toSnakeCase($value);
-        $name = $this->escapeKeyword($base);
-        return $name;
+        return $this->escapeKeyword($base);
     }
 }

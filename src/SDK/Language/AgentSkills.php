@@ -65,12 +65,6 @@ class AgentSkills extends Language
         return $param['default'] ?? '';
     }
 
-    /**
-     * @param array $param
-     * @param string $lang
-     * @param array $spec
-     * @return string
-     */
     public function getParamExample(array $param, string $lang = '', array $spec = []): string
     {
         return $param['example'] ?? '';

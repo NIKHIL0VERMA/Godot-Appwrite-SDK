@@ -1,8 +1,12 @@
 <?php
 
-namespace Tests;
+declare(strict_types=1);
 
-class Godot4Test extends Base
+namespace Tests\E2E;
+
+use Appwrite\SDK\Language\Godot;
+
+final class Godot4Test extends Base
 {
     protected string $sdkName = 'godot';
     protected string $sdkPlatform = 'client';
@@ -10,7 +14,7 @@ class Godot4Test extends Base
     protected string $version = '0.0.1';
 
     protected string $language = 'godot';
-    protected string $class = 'Appwrite\SDK\Language\Godot';
+    protected string $class = Godot::class;
 
     protected array $build = [
         'cp tests/languages/godot/test.gd tests/sdks/godot/tests/test.gd',

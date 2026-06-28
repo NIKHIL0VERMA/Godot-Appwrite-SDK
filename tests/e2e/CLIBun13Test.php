@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\E2E;
 
 use Override;
-use Appwrite\SDK\Language;
 use Appwrite\SDK\Language\CLI;
 
 final class CLIBun13Test extends Base
