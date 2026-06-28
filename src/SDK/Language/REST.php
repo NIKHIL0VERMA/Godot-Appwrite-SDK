@@ -102,28 +102,28 @@ class REST extends HTTP
         return match ($type) {
             self::TYPE_ARRAY => (function () use ($example) {
                     // If array of strings, make sure any sub-strings are escaped
-                    if (\substr((string) $example, 1, 1) === '"') {
-                        $start = \substr((string) $example, 0, 2);
-                        $end = \substr((string) $example, -2);
-                        $contents = \substr((string) $example, 2, -2);
-                        $contents = \addslashes($contents);
-                        return $start . $contents . $end;
-                    } else {
-                        return $example;
-                    }
-                })(),
+                if (\substr((string) $example, 1, 1) === '"') {
+                    $start = \substr((string) $example, 0, 2);
+                    $end = \substr((string) $example, -2);
+                    $contents = \substr((string) $example, 2, -2);
+                    $contents = \addslashes($contents);
+                    return $start . $contents . $end;
+                } else {
+                    return $example;
+                }
+            })(),
             self::TYPE_FILE, self::TYPE_INTEGER, self::TYPE_NUMBER => $example,
             self::TYPE_BOOLEAN => ($example) ? 'true' : 'false',
             self::TYPE_OBJECT => ($example === '{}')
             ? '{}'
             : (($formatted = json_encode(json_decode((string) $example, true), JSON_PRETTY_PRINT))
-                ? (function () use ($formatted): string|array|null{
+                ? (function () use ($formatted): string|array|null {
                         // Replace leading four spaces with two spaces for indentation
                         $formatted = preg_replace('/^    /m', '  ', $formatted);
                         // Add two spaces before the closing brace if it's on a new line at the end
                         $formatted = preg_replace('/\n(?=[^}]*}$)/', "\n  ", (string) $formatted);
                         return $formatted;
-                    })()
+                })()
                 : $example),
             self::TYPE_STRING => "\"{$example}\"",
         };

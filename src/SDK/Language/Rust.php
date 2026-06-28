@@ -646,7 +646,7 @@ class Rust extends Language
                     \is_int($value), \is_float($value) => (string) $value,
                     \is_array($value) => "serde_json::json!(" . json_encode($value, JSON_UNESCAPED_SLASHES) . ")",
                     default => "serde_json::Value::Null",
-                },
+            },
         };
     }
 
