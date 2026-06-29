@@ -51,6 +51,11 @@ class Godot extends GDScript
             ],
             [
                 'scope' => 'copy',
+                'destination' => '.gitattributes',
+                'template' => 'godot/.gitattributes',
+            ],
+            [
+                'scope' => 'copy',
                 'destination' => '.gitignore',
                 'template' => 'godot/.gitignore',
             ],
@@ -136,7 +141,7 @@ class Godot extends GDScript
             ],
             [
                 'scope' => 'default',
-                'destination' => '.env',
+                'destination' => '.env.example',
                 'template' => 'godot/.env.twig',
             ],
             [
@@ -171,13 +176,8 @@ class Godot extends GDScript
             ],
             [
                 'scope' => 'method',
-                'destination' => 'docs/examples/{{service.name | caseSnake}}/{{method.name | caseSnake}}.md',
+                'destination' => 'docs/{{service.name | caseSnake}}/{{method.name | caseSnake}}.md',
                 'template' => 'godot/docs/example.md.twig',
-            ],
-            [
-                'scope' => 'copy',
-                'destination' => '.editorconfig',
-                'template' => 'godot/.editorconfig',
             ],
             [
                 'scope' => 'copy',
@@ -198,7 +198,17 @@ class Godot extends GDScript
                 'scope' => 'copy',
                 'destination' => 'icon.svg',
                 'template' => 'godot/addons/icon.svg',
-            ]
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'imgs/.gdignore',
+                'template' => 'godot/.gdignore',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/.gdignore',
+                'template' => 'godot/.gdignore',
+            ],
         ];
     }
 }

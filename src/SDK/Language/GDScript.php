@@ -193,6 +193,11 @@ class GDScript extends Language
                 'template' => 'gdscript/.gitignore',
             ],
             [
+                'scope' => 'copy',
+                'destination' => '.gitattributes',
+                'template' => 'gdscript/.gitattributes',
+            ],
+            [
                 'scope' => 'default',
                 'destination' => 'addons/{{ spec.title | caseSnake }}/utils/client.gd',
                 'template' => 'gdscript/addons/utils/client.gd.twig',
@@ -239,7 +244,7 @@ class GDScript extends Language
             ],
             [
                 'scope' => 'default',
-                'destination' => '.env',
+                'destination' => '.env.example',
                 'template' => 'gdscript/.env.twig',
             ],
             [
@@ -299,8 +304,18 @@ class GDScript extends Language
             ],
             [
                 'scope' => 'method',
-                'destination' => 'docs/examples/{{service.name | caseSnake}}/{{method.name | caseSnake}}.md',
+                'destination' => 'docs/{{service.name | caseSnake}}/{{method.name | caseSnake}}.md',
                 'template' => 'gdscript/docs/example.md.twig',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'imgs/.gdignore',
+                'template' => 'gdscript/.gdignore',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/.gdignore',
+                'template' => 'gdscript/.gdignore',
             ],
         ];
     }
