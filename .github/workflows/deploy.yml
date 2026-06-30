@@ -57,8 +57,8 @@ jobs:
         run: |
           cd ${{ matrix.platform }}-sdk
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "Nikhil0verma"
+          git config user.email "nikhil2003verma@gmail.com"
 
           if git diff --quiet && git diff --cached --quiet; then
             echo "No changes"

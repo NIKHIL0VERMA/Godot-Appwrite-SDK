@@ -254,6 +254,21 @@ class Godot extends GDScript
                 'destination' => '.github/workflows/ci.yml',
                 'template' => 'godot/.github/workflows/ci.yml',
             ],
+            [
+                'scope' => 'copy',
+                'destination' => 'imgs/anonymous_session.png',
+                'template' => 'godot/imgs/anonymous_session.png',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'imgs/email_pass_session.png',
+                'template' => 'godot/imgs/email_pass_session.png',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'imgs/list_docs.png',
+                'template' => 'godot/imgs/list_docs.png',
+            ],
         ];
     }
 }

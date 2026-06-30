@@ -21,7 +21,7 @@ func _ready():
 {% if method.auth|length > 0 %}
     {{prefix}}.set_endpoint('{{ spec.endpointDocs | raw }}') # Your API Endpoint
 {% for node in method.auth %}
-{% for key,header in node|keys %}
+{% for key,header in node|keys|filter(h => not node[h]['x-appwrite']['optional'] ) %}
     {{prefix}}.set_{{header | caseSnake}}('{{node[header]['x-appwrite']['demo'] | raw }}') # {{node[header].description}}
 {% endfor %}
 {% endfor %}
