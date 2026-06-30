@@ -317,6 +317,46 @@ class GDScript extends Language
                 'destination' => 'docs/.gdignore',
                 'template' => 'gdscript/.gdignore',
             ],
+            [
+                'scope' => 'copy',
+                'destination' => 'tests/.gdignore',
+                'template' => 'gdscript/.gdignore',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/overrides/assets/img/favicon.ico',
+                'template' => 'gdscript/docs/overrides/assets/img/favicon.ico',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/overrides/assets/img/icon.svg',
+                'template' => 'gdscript/addons/icon.svg',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/overrides/modules/footer.html',
+                'template' => 'gdscript/docs/overrides/modules/footer.html',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/index.md',
+                'template' => 'gdscript/docs/index.md',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/getting_started.md',
+                'template' => 'gdscript/docs/getting_started.md',
+            ],
+            [
+                'scope' => 'default',
+                'destination' => 'docs/configuration.md',
+                'template' => 'gdscript/docs/configuration.md.twig',
+            ],
+            [
+                'scope' => 'default',
+                'destination' => 'mkdocs.yml',
+                'template' => 'gdscript/mkdocs.yml.twig',
+            ],
         ];
     }
 

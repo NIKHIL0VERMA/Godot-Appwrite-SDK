@@ -1,7 +1,13 @@
+{% set prefix = spec.title | caseUcfirst %}
+## {{method.name | caseCamel}}
 {% if method.description %}{{ method.description }}{% endif %}
 
+
+---
+
+### Usage Example
+
 ```gdscript
-{% set prefix = spec.title | caseUcfirst %}
 extends Node
 
 {% if method.responseModel and method.responseModel != 'any' %}
@@ -34,3 +40,4 @@ func _ready():
     if result is {{return_type}}:
         print(result.to_dict())
 ```
+---

@@ -1,4 +1,4 @@
-# {% set prefix = spec.title | caseUcfirst %}Client
+{% set prefix = spec.title | caseUcfirst %}
 extends RefCounted
 
 signal on_progress(progress: float, total_size: int, uploaded_size: int)

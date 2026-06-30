@@ -452,5 +452,5 @@ func run_operator_tests() -> void:
     print(AppwriteOperator.date_sub_days(3))
     print(AppwriteOperator.date_set_now())
 
-    var headers = Appwrite.get_headers()
-    print(headers)
+    var headers = await Appwrite.general.headers()
+    print_response(headers)

@@ -209,6 +209,46 @@ class Godot extends GDScript
                 'destination' => 'docs/.gdignore',
                 'template' => 'godot/.gdignore',
             ],
+            [
+                'scope' => 'copy',
+                'destination' => 'tests/.gdignore',
+                'template' => 'godot/.gdignore',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/overrides/assets/img/favicon.ico',
+                'template' => 'godot/docs/overrides/assets/img/favicon.ico',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/overrides/assets/img/icon.svg',
+                'template' => 'godot/addons/icon.svg',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/overrides/modules/footer.html',
+                'template' => 'godot/docs/overrides/modules/footer.html',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/index.md',
+                'template' => 'godot/docs/index.md',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/getting_started.md',
+                'template' => 'godot/docs/getting_started.md',
+            ],
+            [
+                'scope' => 'default',
+                'destination' => 'docs/configuration.md',
+                'template' => 'godot/docs/configuration.md.twig',
+            ],
+            [
+                'scope' => 'default',
+                'destination' => 'mkdocs.yml',
+                'template' => 'godot/mkdocs.yml.twig',
+            ],
         ];
     }
 }

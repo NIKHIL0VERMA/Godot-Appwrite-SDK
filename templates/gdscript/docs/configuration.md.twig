@@ -1,0 +1,35 @@
+{% set prefix = spec.title | caseUcfirst %}
+# Configuration
+
+There are two way to config the sdk.
+
+## Runtime configuration
+Supported methods:
+
+- set_endpoint(endpoint: String) -> Variant
+- add_header(key: String, value: String) -> RefCounted
+- set_self_signed(status: bool = true) -> RefCounted
+{% for header in spec.global.headers %}
+- set_{{header.key | caseSnake}}(value: String) -> RefCounted
+{% endfor %}
+
+### Example Usage
+
+```gdscript
+extends Node
+
+func _ready():
+    {{prefix}}.set_endpoint('<API Endpoint>')
+    {{prefix}}.set_project('<Project ID>')
+```
+
+## Environment Variables
+Copy the downloaded `.env.example` to `res://.env` and fill in the values.
+
+Supported variables:
+
+- {{ prefix | caseUpper }}_ENDPOINT
+- {{ prefix | caseUpper }}_SELF_SIGNED
+{% for header in spec.global.headers %}
+- {{ prefix | caseUpper }}_{{ header.key | caseUpper }}
+{% endfor %}
