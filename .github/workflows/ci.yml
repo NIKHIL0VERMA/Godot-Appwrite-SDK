@@ -8,7 +8,7 @@ on:
   pull_request:
   push:
     branches:
-      - feat/godot-support
+      - main 
 
 jobs:
   tests:
@@ -31,10 +31,8 @@ jobs:
           DotNet90,
           FlutterStable,
           FlutterBeta,
-          GDScript4,
           Go112,
           Go118,
-          Godot4,
           KotlinJava17,
           Node26,
           Node18,

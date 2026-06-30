@@ -1,0 +1,70 @@
+name: Deploy SDKs
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_run:
+    workflows: ["Godot SDK Test"]
+    types:
+      - completed
+
+jobs:
+  deploy-sdks:
+    if: >
+      github.event.workflow_run.conclusion == 'success'
+    name: "Deploy SDK / ${{ matrix.target }}"
+    runs-on: ubuntu-latest
+    strategy:
+        fail-fast: false
+        matrix:
+            include:
+                - target: godot
+                  platform: client
+                  repo: Godot-Appwrite-client-SDK
+                
+                - target: gdscript
+                  platform: server
+                  repo: Godot-Appwrite-server-SDK
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+
+      - name: Setup PHP with PECL extension
+        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # 2.37.0
+        with:
+          php-version: '8.5'
+          extensions: curl
+
+      - name: Install Deps
+        run: composer install
+
+      - name: Generate ${{ matrix.platform }} SDK
+        run: php example.php ${{ matrix.target }} ${{ matrix.platform }}
+    
+      - name: Clone ${{ matrix.platform }} SDK repo
+        run: |
+          git clone https://x-access-token:${{ secrets.GODOT_CI_SDK_PUSH_TOKEN }}@github.com/NIKHIL0VERMA/${{ matrix.repo }}.git ${{ matrix.platform }}-sdk
+
+      - name: Update ${{ matrix.platform }} SDK
+        run: |
+          rsync -av --delete examples/${{ matrix.target }}/ ${{ matrix.platform }}-sdk/
+
+      - name: Commit
+        run: |
+          cd ${{ matrix.platform }}-sdk
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+
+          git add .
+          git commit -m "Update SDK from generator (${GITHUB_SHA::7})"
+          git push origin main
