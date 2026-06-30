@@ -249,6 +249,11 @@ class Godot extends GDScript
                 'destination' => 'mkdocs.yml',
                 'template' => 'godot/mkdocs.yml.twig',
             ],
+            [
+                'scope' => 'copy',
+                'destination' => '.github/workflows/ci.yml',
+                'template' => 'godot/.github/workflows/ci.yml',
+            ],
         ];
     }
 }

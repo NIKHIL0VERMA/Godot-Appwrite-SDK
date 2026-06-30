@@ -357,6 +357,11 @@ class GDScript extends Language
                 'destination' => 'mkdocs.yml',
                 'template' => 'gdscript/mkdocs.yml.twig',
             ],
+            [
+                'scope' => 'copy',
+                'destination' => '.github/workflows/ci.yml',
+                'template' => 'gdscript/.github/workflows/ci.yml',
+            ],
         ];
     }
 

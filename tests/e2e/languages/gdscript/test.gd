@@ -39,6 +39,9 @@ func run_tests() -> void:
     run_id_tests()
     run_operator_tests()
 
+    var headers = await Appwrite.general.headers()
+    print_response(headers)
+
 func print_response(response) -> void:
     if response == null:
         print("null response")
@@ -461,6 +464,3 @@ func run_operator_tests() -> void:
     print(AppwriteOperator.date_add_days(7))
     print(AppwriteOperator.date_sub_days(3))
     print(AppwriteOperator.date_set_now())
-
-    var headers = Appwrite.get_headers()
-    print(headers)
