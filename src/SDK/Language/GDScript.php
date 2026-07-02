@@ -531,6 +531,52 @@ class GDScript extends Language
         return array_merge([
             new TwigFilter('caseEnumKey', fn(string $value): string => $this->toUpperSnakeCase($value)),
             new TwigFilter('uniqueSnake', fn(string $value): string => $this->toUniqueSnake($value)),
+            new TwigFilter('enumExample', function (array $param): string {
+                $enumValues = $param['enumValues'] ?? [];
+                if (empty($enumValues)) {
+                    return '';
+                }
+
+                $enumKeys = $param['enumKeys'] ?? [];
+                $enumName = $this->toPascalCase($param['enumName'] ?? $param['name'] ?? '');
+                $example = $param['example'] ?? null;
+                $isArray = ($param['type'] ?? '') === self::TYPE_ARRAY;
+
+                $resolveKey = function ($value) use ($enumValues, $enumKeys): string {
+                    $index = array_search($value, $enumValues, true);
+                    if ($index !== false && isset($enumKeys[$index]) && $enumKeys[$index] !== '') {
+                        return $this->toUpperSnakeCase($enumKeys[$index]);
+                    }
+                    if ($index !== false && isset($enumValues[$index])) {
+                        return $this->toUpperSnakeCase($enumValues[$index]);
+                    }
+                    $fallback = $enumKeys[0] ?? $enumValues[0] ?? $value;
+                    return $this->toUpperSnakeCase((string) $fallback);
+                };
+
+                if ($isArray) {
+                    $values = [];
+                    if (\is_string($example) && $example !== '') {
+                        $decoded = json_decode($example, true);
+                        if (\is_array($decoded)) {
+                            $values = $decoded;
+                        }
+                    } elseif (\is_array($example)) {
+                        $values = $example;
+                    }
+
+                    if ($values === []) {
+                        $values = [$enumValues[0]];
+                    }
+
+                    $items = array_map(fn($value): string => $enumName . '.' . $resolveKey($value), $values);
+
+                    return '[' . implode(', ', $items) . ']';
+                }
+
+                $value = ($example !== null && $example !== '') ? $example : $enumValues[0];
+                return $enumName . '.' . $resolveKey($value);
+            }),
         ], parent::getFilters());
     }
 
