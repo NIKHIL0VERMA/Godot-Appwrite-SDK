@@ -101,7 +101,7 @@ func load_svg() -> String:
 	if file == null:
 		return ""
 	var svg := file.get_as_text()
-	svg = svg.replace("<svg", "<svg width=\"60\" height=\"60\"")
+	svg = svg.replace("<svg", "<svg viewBox=\"0 0 512 512\" width=\"60\" height=\"60\"")
 	file = null
 	return svg
 

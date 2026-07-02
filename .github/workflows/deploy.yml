@@ -51,7 +51,7 @@ jobs:
 
       - name: Update ${{ matrix.platform }} SDK
         run: |
-          rsync -av --delete examples/${{ matrix.target }}/ ${{ matrix.platform }}-sdk/
+          rsync -av --exclude=.git/ --delete examples/${{ matrix.target }}/ ${{ matrix.platform }}-sdk/
 
       - name: Commit
         run: |
