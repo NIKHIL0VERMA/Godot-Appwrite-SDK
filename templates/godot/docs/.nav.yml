@@ -1,0 +1,6 @@
+nav:
+  - Introduction: "index.md"
+  - "getting_started.md"
+  - "configuration.md"
+  - "authentication.md"
+  - "*"

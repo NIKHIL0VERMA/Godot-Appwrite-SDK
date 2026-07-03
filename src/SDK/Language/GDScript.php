@@ -359,8 +359,28 @@ class GDScript extends Language
             ],
             [
                 'scope' => 'copy',
+                'destination' => 'docs/.nav.yml',
+                'template' => 'gdscript/docs/.nav.yml',
+            ],
+            [
+                'scope' => 'copy',
                 'destination' => '.github/workflows/ci.yml',
                 'template' => 'gdscript/.github/workflows/ci.yml',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'imgs/create_bucket.png',
+                'template' => 'gdscript/imgs/create_bucket.png',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'imgs/create_db.png',
+                'template' => 'gdscript/imgs/create_db.png',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'imgs/create_user.png',
+                'template' => 'gdscript/imgs/create_user.png',
             ],
         ];
     }

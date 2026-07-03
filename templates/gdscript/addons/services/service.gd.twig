@@ -100,7 +100,7 @@ func {{ methodNameSnake| escapeKeyword }}({% for parameter in method.parameters.
     {%~ if method.auth|length > 0 %}
     {%~ for node in method.auth %}
     {%~ for key,header in node|keys %}
-    _params['{{header|caseLower}}'] = client.get_headers()['x-appwrite-{{header| caseLower | caseKebab}}']
+    _params['{{header|caseLower}}'] = client.get_headers()['x-appwrite-{{header| caseKebab | caseLower }}']
     {%~ endfor %}
     {%~ endfor %}
     {%~ endif %}

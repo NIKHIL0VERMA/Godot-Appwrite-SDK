@@ -245,9 +245,19 @@ class Godot extends GDScript
                 'template' => 'godot/docs/configuration.md.twig',
             ],
             [
+                'scope' => 'copy',
+                'destination' => 'docs/authentication.md',
+                'template' => 'godot/docs/authentication.md',
+            ],
+            [
                 'scope' => 'default',
                 'destination' => 'mkdocs.yml',
                 'template' => 'godot/mkdocs.yml.twig',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'docs/.nav.yml',
+                'template' => 'godot/docs/.nav.yml',
             ],
             [
                 'scope' => 'copy',
