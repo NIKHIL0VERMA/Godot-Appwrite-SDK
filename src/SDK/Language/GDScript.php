@@ -309,11 +309,6 @@ class GDScript extends Language
             ],
             [
                 'scope' => 'copy',
-                'destination' => 'imgs/.gdignore',
-                'template' => 'gdscript/.gdignore',
-            ],
-            [
-                'scope' => 'copy',
                 'destination' => 'docs/.gdignore',
                 'template' => 'gdscript/.gdignore',
             ],
@@ -371,21 +366,6 @@ class GDScript extends Language
                 'scope' => 'copy',
                 'destination' => '.github/workflows/ci.yml',
                 'template' => 'gdscript/.github/workflows/ci.yml',
-            ],
-            [
-                'scope' => 'copy',
-                'destination' => 'imgs/create_bucket.png',
-                'template' => 'gdscript/imgs/create_bucket.png',
-            ],
-            [
-                'scope' => 'copy',
-                'destination' => 'imgs/create_db.png',
-                'template' => 'gdscript/imgs/create_db.png',
-            ],
-            [
-                'scope' => 'copy',
-                'destination' => 'imgs/create_user.png',
-                'template' => 'gdscript/imgs/create_user.png',
             ],
         ];
     }
@@ -494,7 +474,6 @@ class GDScript extends Language
 
         return $output;
     }
-
     public function getParamExample(array $param, string $lang = '', array $spec = []): string
     {
         $type = $param['type'] ?? '';

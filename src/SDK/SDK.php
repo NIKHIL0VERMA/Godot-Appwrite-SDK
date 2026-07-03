@@ -115,7 +115,7 @@ class SDK
         $this->twig->addFilter(new TwigFilter('typeName', fn(array $value, array $spec = []): string => $this->language->getTypeName($value, $spec), ['is_safe' => ['html']]));
         $this->twig->addFilter(new TwigFilter('getValidResponseModels', fn(array $value): array => $this->getValidResponseModels($value)));
         $this->twig->addFilter(new TwigFilter('paramDefault', fn(array $value): string => $this->language->getParamDefault($value), ['is_safe' => ['html']]));
-        $this->twig->addFilter(new TwigFilter('paramExample', fn(array $value): string => $this->language->getParamExample($value), ['is_safe' => ['html']]));
+        $this->twig->addFilter(new TwigFilter('paramExample', fn(array $value, string $lang = '', array $spec = []): string => $this->language->getParamExample($value, $lang, $spec), ['is_safe' => ['html']]));
         $this->twig->addFilter(new TwigFilter('wrap', function ($value, int $width = 75, string $prefix = ''): string {
             $lines = explode("\n", (string) $value);
             foreach ($lines as $key => $line) {
