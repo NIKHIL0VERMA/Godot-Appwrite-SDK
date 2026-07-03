@@ -334,6 +334,11 @@ class GDScript extends Language
             ],
             [
                 'scope' => 'copy',
+                'destination' => 'docs/overrides/assets/js/gdscript.min.js',
+                'template' => 'gdscript/docs/overrides/assets/js/gdscript.min.js'
+            ],
+            [
+                'scope' => 'copy',
                 'destination' => 'docs/overrides/modules/footer.html',
                 'template' => 'gdscript/docs/overrides/modules/footer.html',
             ],

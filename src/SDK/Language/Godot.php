@@ -226,6 +226,11 @@ class Godot extends GDScript
             ],
             [
                 'scope' => 'copy',
+                'destination' => 'docs/overrides/assets/js/gdscript.min.js',
+                'template' => 'godot/docs/overrides/assets/js/gdscript.min.js'
+            ],
+            [
+                'scope' => 'copy',
                 'destination' => 'docs/overrides/modules/footer.html',
                 'template' => 'godot/docs/overrides/modules/footer.html',
             ],

@@ -15,7 +15,7 @@ The SDK starts a lightweight local TCP server on port `8888` during OAuth authen
 
 This approach requires no platform-specific URL scheme registration and works consistently across all platforms.
 
-> [!NOTE] However, currently, you need to manually pass the URL to SDK. We are working to automate this process. In future you can expect it to be plug and play.
+However, currently, you need to manually pass the URLs to SDK. We are working to automate this process. In future you can expect it to be plug and play.
 
 #### Why not use a custom URL scheme?
 Custom URL schemes must be registered differently on each operating system (Windows, macOS, linux, Android, iOS, etc). Using a local callback server provides a single cross-platform implementation, keeping the authentication flow identical regardless of the build target.

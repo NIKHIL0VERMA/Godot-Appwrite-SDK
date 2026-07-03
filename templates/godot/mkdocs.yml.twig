@@ -1,9 +1,9 @@
 site_name: {{ spec.title | caseUcfirst }} SDK for Godot 4
 site_description: Community-maintained {{ spec.title | caseUcfirst }} SDK for Godot 4
-site_url: https://nikhil0verma.github.io/godot-appwrite-client-sdk
+site_url: https://nikhil0verma.github.io/Godot-Appwrite-client-SDK/
 site_author: Nikhil Verma, nikhil2003verma@gmail.com
 repo_url: https://github.com/NIKHIL0VERMA/Godot-Appwrite-client-SDK
-repo_name: Nikhil0Verma/godot-appwrite-client-sdk
+repo_name: Nikhil0Verma/Godot-Appwrite-client-SDK
 
 theme:
   name: dracula
@@ -12,9 +12,6 @@ theme:
   custom_dir: docs/overrides
 
 markdown_extensions:
-  - admonition
-  - attr_list
-  - md_in_html
   - toc:
       permalink: true
 
@@ -27,3 +24,6 @@ copyright: Copyright © 2026 Nikhil Verma
 validation:
   links:
     absolute_links: ignore
+
+extra_javascript:
+  - assets/js/gdscript.min.js
