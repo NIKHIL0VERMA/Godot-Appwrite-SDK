@@ -30,7 +30,7 @@ final class Android16Java17Test extends Base
     ];
     #[Override]
     protected string $command =
-        'docker run --rm --network="mockapi" -v $(pwd):/app -w /app/tests/e2e/sdks/android alvrme/alpine-android:android-36-jdk17 sh -c "./gradlew :library:testDebugUnitTest --stacktrace 1>&2 && cat library/result.txt"';
+        'docker run --rm --network="mockapi" -v $(pwd):/app -w /app/tests/e2e/sdks/android alvrme/alpine-android:android-CinnamonBun-jdk17 sh -c "./gradlew :library:testDebugUnitTest --stacktrace 1>&2 && cat library/result.txt"';
 
     #[Override]
     protected array $expectedOutput = [
@@ -38,7 +38,10 @@ final class Android16Java17Test extends Base
         ...Base::FOO_RESPONSES,
         ...Base::BAR_RESPONSES,
         ...Base::GENERAL_RESPONSES,
+        ...Base::PATH_VALIDATION_RESPONSES,
+        ...Base::NULL_PATH_RESPONSE,
         ...Base::UPLOAD_RESPONSES,
+        ...Base::DOWNLOAD_RESPONSES,
         ...Base::ENUM_RESPONSES,
         ...Base::MODEL_RESPONSES,
         ...Base::EXCEPTION_RESPONSES,

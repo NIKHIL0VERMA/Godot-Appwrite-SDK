@@ -20,6 +20,7 @@ bar = Bar(client)
 general = General(client)
 
 client.add_header('Origin', 'http://localhost')
+client.set_project('console')
 client.set_self_signed()
 
 print("\nTest Started")
@@ -65,6 +66,14 @@ print(response.result)
 response = general.redirect()
 print(response['result'])
 
+for id, plain in [('', '0'), ('0', '')]:
+    try:
+        general.validate_path(plain, id)
+        raise AssertionError('Empty path parameter was accepted')
+    except AppwriteException as error:
+        print(error.message)
+print(general.validate_path('0', '0').result)
+
 response = general.upload('string', 123, ['string in array'], InputFile.from_path('./tests/resources/file.png'))
 print(response.result)
 
@@ -78,6 +87,8 @@ print(response.result)
 data = open('./tests/resources/large_file.mp4', 'rb').read()
 response = general.upload('string', 123, ['string in array'], InputFile.from_bytes(data, 'large_file.mp4','video/mp4'))
 print(response.result)
+
+print(general.download().decode())
 
 response = general.enum(MockType.FIRST)
 print(response.result)
@@ -175,6 +186,9 @@ print(Query.distance_greater_than("location", [40.7128, -74], 1000))
 print(Query.distance_greater_than("location", [40.7128, -74], 1000, True))
 print(Query.distance_less_than("location", [40.7128, -74], 1000))
 print(Query.distance_less_than("location", [40.7128, -74], 1000, True))
+print(Query.vector_dot("embedding", [0.1, 0.2, 0.3]))
+print(Query.vector_cosine("embedding", [0.1, 0.2, 0.3]))
+print(Query.vector_euclidean("embedding", [0.1, 0.2, 0.3]))
 
 # Spatial query tests
 print(Query.intersects("location", [40.7128, -74]))

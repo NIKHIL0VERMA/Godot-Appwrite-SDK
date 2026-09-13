@@ -27,7 +27,7 @@ func parseQuery(options queryOptions) string {
 		Attribute string        `json:"attribute,omitempty"`
 		Values    []interface{} `json:"values,omitempty"`
 	}{
-		Method:    options.Method,
+		Method: options.Method,
 	}
 
 	if options.Attribute != nil {
@@ -282,32 +282,32 @@ func OrderRandom() string {
 func CursorBefore(documentId interface{}) string {
 	values := toArray(documentId)
 	return parseQuery(queryOptions{
-		Method:    "cursorBefore",
-		Values:    &values,
+		Method: "cursorBefore",
+		Values: &values,
 	})
 }
 
 func CursorAfter(documentId string) string {
 	values := toArray(documentId)
 	return parseQuery(queryOptions{
-		Method:    "cursorAfter",
-		Values:    &values,
+		Method: "cursorAfter",
+		Values: &values,
 	})
 }
 
 func Limit(limit int) string {
 	values := toArray(limit)
 	return parseQuery(queryOptions{
-		Method:    "limit",
-		Values:    &values,
+		Method: "limit",
+		Values: &values,
 	})
 }
 
 func Offset(offset int) string {
 	values := toArray(offset)
 	return parseQuery(queryOptions{
-		Method:    "offset",
-		Values:    &values,
+		Method: "offset",
+		Values: &values,
 	})
 }
 
@@ -372,6 +372,30 @@ func DistanceLessThan(attribute string, values []interface{}, distance float64, 
 		Method:    "distanceLessThan",
 		Attribute: &attribute,
 		Values:    &[]interface{}{[]interface{}{values, distance, meters}},
+	})
+}
+
+func VectorDot(attribute string, vector []float64) string {
+	return parseQuery(queryOptions{
+		Method:    "vectorDot",
+		Attribute: &attribute,
+		Values:    &[]interface{}{vector},
+	})
+}
+
+func VectorCosine(attribute string, vector []float64) string {
+	return parseQuery(queryOptions{
+		Method:    "vectorCosine",
+		Attribute: &attribute,
+		Values:    &[]interface{}{vector},
+	})
+}
+
+func VectorEuclidean(attribute string, vector []float64) string {
+	return parseQuery(queryOptions{
+		Method:    "vectorEuclidean",
+		Attribute: &attribute,
+		Values:    &[]interface{}{vector},
 	})
 }
 

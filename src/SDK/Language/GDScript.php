@@ -4,6 +4,8 @@ namespace Appwrite\SDK\Language;
 
 use Override;
 use Appwrite\SDK\Language;
+use Utopia\OpenAPI\Model\Parameter;
+use Utopia\OpenAPI\Model\Schema;
 use Twig\TwigFilter;
 
 class GDScript extends Language
@@ -370,7 +372,7 @@ class GDScript extends Language
         ];
     }
 
-    public function getTypeName(array $parameter, array $spec = []): string
+    public function getTypeName(Schema|Parameter $parameter, array $spec = []): string
     {
         $prefix = $this->toPascalCase($spec['title'] ?? '');
 
@@ -420,7 +422,7 @@ class GDScript extends Language
         };
     }
 
-    public function getParamDefault(array $param): string
+    public function getParamDefault(Schema|Parameter $param): string
     {
         $type = $param['type'] ?? '';
         $default = $param['default'] ?? '';

@@ -1,82 +1,82 @@
 <?php
 
-namespace {{ spec.namespace | caseNamespace }};
-{% if spec.global.headers | hasBearerAuth %}
+declare(strict_types=1);
 
+namespace {{ namespace | caseNamespace }};
+
+{% if globalHeaders | hasBearerAuth %}
 use Ahc\Jwt\JWT;
 {% endif %}
+use Psr\Http\Client\ClientExceptionInterface;
+use Psr\Http\Client\ClientInterface;
+use Utopia\Client as HttpClient;
+use Utopia\Client\Adapter\Curl\Client as CurlAdapter;
+use Utopia\Psr7\Request\Factory as RequestFactory;
+use Utopia\Psr7\Request\Multipart\Part;
 
 class Client
 {
-    const METHOD_GET = 'GET';
-    const METHOD_POST = 'POST';
-    const METHOD_PUT = 'PUT';
-    const METHOD_PATCH = 'PATCH';
-    const METHOD_DELETE = 'DELETE';
-    const METHOD_HEAD = 'HEAD';
-    const METHOD_OPTIONS = 'OPTIONS';
-    const METHOD_CONNECT = 'CONNECT';
-    const METHOD_TRACE = 'TRACE';
+    public const METHOD_GET = 'GET';
+    public const METHOD_POST = 'POST';
+    public const METHOD_PUT = 'PUT';
+    public const METHOD_PATCH = 'PATCH';
+    public const METHOD_DELETE = 'DELETE';
+    public const METHOD_HEAD = 'HEAD';
+    public const METHOD_OPTIONS = 'OPTIONS';
+    public const METHOD_CONNECT = 'CONNECT';
+    public const METHOD_TRACE = 'TRACE';
 
-    const CHUNK_SIZE = 5 * 1024 * 1024;
-{% if spec.global.headers | hasBearerAuth %}
-    const JWT_MAX_AGE_SECONDS = 3600;
+    public const CHUNK_SIZE = 5 * 1024 * 1024;
+{% if globalHeaders | hasBearerAuth %}
+    public const JWT_MAX_AGE_SECONDS = 3600;
 {% endif %}
 
     /**
      * Is Self Signed Certificates Allowed?
      *
-     * @var bool
      */
     protected bool $selfSigned = false;
 
     /**
      * Service host name
      *
-     * @var string
      */
-    protected string $endpoint = '{{spec.endpoint}}';
+    protected string $endpoint = '{{(spec | endpoint)}}';
 
     /**
      * Global Headers
      *
-     * @var array
      */
     protected array $headers = [
-        'content-type' => '',
-        'user-agent' => '{{spec.title | caseUcfirst}}{{ language.name | caseUcfirst }}SDK/{{ sdk.version }} ({{deviceInfo}})',
-        'x-sdk-name'=> '{{ sdk.name }}',
-        'x-sdk-platform'=> '{{ sdk.platform }}',
-        'x-sdk-language'=> '{{ language.name | caseLower }}',
-        'x-sdk-version'=> '{{ sdk.version }}',
+        'user-agent' => '{{spec.info.title | caseUcfirst}}{{ language.name | caseUcfirst }}SDK/{{ sdk.version }} ({{deviceInfo}})',
+        'x-sdk-name' => '{{ sdk.name }}',
+        'x-sdk-platform' => '{{ sdk.platform }}',
+        'x-sdk-language' => '{{ language.name | caseLower }}',
+        'x-sdk-version' => '{{ sdk.version }}',
     ];
 
     /**
      * Auth/config values used by generated service methods.
      *
-     * @var array
      */
     protected array $config = [];
 
-{% if spec.global.headers | hasBearerAuth %}
+{% if globalHeaders | hasBearerAuth %}
     /**
      * API key for JWT generation
      *
-     * @var string|null
      */
     protected ?string $key = null;
 
     /**
      * Cached authorization header value
      *
-     * @var string|null
      */
     protected ?string $authorization = null;
 
     /**
      * Authorization header expiry time
      *
-     * @var \DateTime|null
      */
     protected ?\DateTime $authorizationExpiresAt = null;
 
@@ -84,56 +84,94 @@ class Client
     /**
      * Timeout in seconds
      *
-     * @var int|null
      */
     protected ?int $timeout = null;
 
     /**
      * Connect timeout in seconds
      *
-     * @var int|null
      */
     protected ?int $connectTimeout = null;
 
     /**
-     * Client constructor.
+     * Reused Utopia HTTP client (follows redirects).
+     *
      */
-    public function __construct()
+    protected ?HttpClient $httpClient = null;
+
+    /**
+     * Reused Utopia HTTP client that does not follow redirects.
+     *
+     */
+    protected ?HttpClient $httpClientNoRedirect = null;
+
+    /**
+     * PSR-7 request factory.
+     *
+     */
+    protected RequestFactory $requestFactory;
+
+    /**
+     * An injected PSR-18 transport owns its timeout, TLS, connection reuse and
+     * redirect configuration. Without one, the SDK configures its cURL client.
+     */
+    public function __construct(private readonly ?ClientInterface $transport = null)
     {
-{% for key,header in spec.global.defaultHeaders %}
+        $this->requestFactory = new RequestFactory();
+{% for key,header in defaultHeaders %}
         $this->headers['{{key}}'] = '{{header}}';
-{% endfor %} 
+{% endfor %}
     }
 
-{% for header in spec.global.headers %}
+{% for headerKey, header in globalHeaders %}
     /**
-     * Set {{header.key | caseUcfirst}}
+     * Set {{headerKey | caseUcfirst}}
      *
 {% if header.description %}
      * {{header.description}}
      *
 {% endif %}
-     * @param string $value
      *
-     * @return Client
      */
-    public function set{{header.key | caseUcfirst}}(string $value): Client
+    public function set{{headerKey | caseUcfirst}}(string $value): Client
     {
-{% if header.type is defined and header.type == 'bearer' %}
-        $this->key = $value;
+        {%~ if (headerKey != 'Project') %}
+        $this->addHeader('{{header.name}}', {% if header.scheme == 'bearer' %}"Bearer {$value}"{% else %}$value{% endif %});
+        {%~ endif %}
+        $this->config['{{ headerKey | caseLower }}'] = $value;
+{% if header.scheme == 'bearer' %}
+        $this->key = null;
         $this->authorization = null;
         $this->authorizationExpiresAt = null;
-{% else %}
-        {%~ if header.global %}
-        $this->addHeader('{{header.name}}', $value);
-        {%~ endif %}
-        $this->config['{{ header.key | caseLower }}'] = $value;
 {% endif %}
 
         return $this;
     }
 
 {% endfor %}
+{% if globalHeaders | hasBearerAuth %}
+    /**
+     * Set Signing Key
+     *
+     * Set a secret key used to self-sign short-lived JWTs for the Authorization header
+     *
+     *
+     */
+    public function setSigningKey(string $key): Client
+    {
+        $this->key = $key;
+        $this->authorization = null;
+        $this->authorizationExpiresAt = null;
+{% for headerKey, header in globalHeaders %}
+{% if header.scheme == 'bearer' %}
+        unset($this->headers['{{ header.name | caseLower }}'], $this->config['{{ headerKey | caseLower }}']);
+{% endif %}
+{% endfor %}
+
+        return $this;
+    }
+
+{% endif %}
 
     public function getConfig(string $key): string
     {
@@ -141,57 +179,54 @@ class Client
     }
 
     /***
-     * @param bool $status
-     * @return $this
      */
     public function setSelfSigned(bool $status = true): Client
     {
         $this->selfSigned = $status;
+        $this->resetHttpClient();
 
         return $this;
     }
 
     /***
-     * @param $endpoint
-     * @return $this
      */
     public function setEndpoint(string $endpoint): Client
     {
         if (!str_starts_with($endpoint, 'http://') && !str_starts_with($endpoint, 'https://')) {
-            throw new {{ spec.namespace | split('\\') | last | caseUcfirst }}Exception("Invalid endpoint URL: $endpoint");
+            throw new {{ namespace | split('\\') | last | caseUcfirst }}Exception("Invalid endpoint URL: $endpoint");
         }
 
         $this->endpoint = $endpoint;
+        $this->resetHttpClient();
+
         return $this;
     }
 
     /**
      * Set Timeout
      *
-     * @param int $timeout Timeout in seconds
-     * @return Client
      */
     public function setTimeout(int $timeout): Client
     {
         $this->timeout = $timeout;
+        $this->resetHttpClient();
+
         return $this;
     }
 
     /**
      * Set Connect Timeout
      *
-     * @param int $connectTimeout Connect timeout in seconds
-     * @return Client
      */
     public function setConnectTimeout(int $connectTimeout): Client
     {
         $this->connectTimeout = $connectTimeout;
+        $this->resetHttpClient();
+
         return $this;
     }
 
     /**
-     * @param $key
-     * @param $value
      */
     public function addHeader(string $key, string $value): Client
     {
@@ -203,18 +238,16 @@ class Client
     /**
      * Get the request headers.
      *
-     * @return array
      */
     public function getHeaders(): array
     {
         return $this->headers;
     }
 
-{% if spec.global.headers | hasBearerAuth %}
+{% if globalHeaders | hasBearerAuth %}
     /**
      * Get authorization header, generating a new JWT if needed
      *
-     * @return string
      */
     private function getAuthorization(): string
     {
@@ -225,7 +258,7 @@ class Client
         $jwt = new JWT($this->key, maxAge: self::JWT_MAX_AGE_SECONDS);
         $this->authorization = "Bearer {$jwt->encode([])}";
 
-        $this->authorizationExpiresAt = (new \DateTime())->modify('+' . (self::JWT_MAX_AGE_SECONDS - 5) . ' seconds');
+        $this->authorizationExpiresAt = new \DateTime()->modify('+' . (self::JWT_MAX_AGE_SECONDS - 5) . ' seconds');
 
         return $this->authorization;
     }
@@ -236,12 +269,7 @@ class Client
      *
      * Make an API call
      *
-     * @param string $method
-     * @param string $path
-     * @param array $params
-     * @param array $headers
-     * @return array|string
-     * @throws {{ spec.namespace | split('\\') | last | caseUcfirst}}Exception
+     * @throws {{ namespace | split('\\') | last | caseUcfirst}}Exception
      */
     public function call(
         string $method,
@@ -249,104 +277,76 @@ class Client
         array $headers = [],
         array $params = [],
         ?string $responseType = null
-    )
-    {
-{% if spec.global.headers | hasBearerAuth %}
+    ) {
+{% if globalHeaders | hasBearerAuth %}
         if ($this->key !== null) {
             $this->headers['authorization'] = $this->getAuthorization();
         }
 {% endif %}
         $headers = array_merge($this->headers, $headers);
-        $querySeparator = str_contains($path, '?') ? '&' : '?';
-        $ch = curl_init($this->endpoint . $path . (($method == self::METHOD_GET && !empty($params)) ? $querySeparator . http_build_query($params) : ''));
-        $responseHeaders = [];
+        $contentType = strtolower((string) ($headers['content-type'] ?? ''));
+        if ($contentType === '') {
+            unset($headers['content-type']);
+        }
+        $uri = $this->endpoint . $path;
 
-        switch ($headers['content-type']) {
-            case 'application/json':
-                $query = json_encode($this->prepareParams($params));
-                break;
+        try {
+            $request = match (true) {
+                $method === self::METHOD_GET => $this->requestFactory->query(
+                    $method,
+                    $uri,
+                    $params,
+                    $headers
+                ),
+                $contentType === 'application/json' => $this->requestFactory->json(
+                    $method,
+                    $uri,
+                    $this->prepareParams($params),
+                    $headers
+                ),
+                $contentType === 'multipart/form-data' => $this->requestFactory->multipart(
+                    $method,
+                    $uri,
+                    $this->toMultipartParts($params),
+                    $headers
+                ),
+                default => $this->requestFactory->form(
+                    $method,
+                    $uri,
+                    $params,
+                    $headers
+                ),
+            };
 
-            case 'multipart/form-data':
-                $query = $this->flatten($params);
-                break;
-
-            default:
-                $query = http_build_query($params);
-                break;
+            $response = $this->getHttpClient($responseType !== 'location')->sendRequest($request);
+        } catch (ClientExceptionInterface|\JsonException $e) {
+            throw new {{ namespace | split('\\') | last | caseUcfirst}}Exception($e->getMessage(), (int) $e->getCode());
         }
 
-        foreach ($headers as $i => $header) {
-            $headers[] = $i . ':' . $header;
-            unset($headers[$i]);
-        }
+        $responseStatus = $response->getStatusCode();
+        $responseContentType = $response->getHeaderLine('content-type');
+        $responseBody = (string) $response->getBody();
 
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($ch, CURLOPT_USERAGENT, php_uname('s') . '-' . php_uname('r') . ':{{ language.name | caseLower }}-' . phpversion());
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, $responseType !== 'location');
-        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($curl, $header) use (&$responseHeaders) {
-            $len = strlen($header);
-            $header = explode(':', strtolower($header), 2);
-
-            if (count($header) < 2) { // ignore invalid headers
-                return $len;
-            }
-
-            $responseHeaders[strtolower(trim($header[0]))] = trim($header[1]);
-
-            return $len;
-        });
-
-        if($method != self::METHOD_GET) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $query);
-        }
-
-        // Allow self signed certificates
-        if($this->selfSigned) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        }
-
-        // Set timeout if configured
-        if($this->timeout !== null) {
-            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-        }
-
-        // Set connect timeout if configured
-        if($this->connectTimeout !== null) {
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $this->connectTimeout);
-        }
-
-        $responseBody   = curl_exec($ch);
-        $contentType    = $responseHeaders['content-type'] ?? '';
-        $responseStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-        $warnings = $responseHeaders['x-{{spec.title | caseLower}}-warning'] ?? '';
+        $warnings = $response->getHeaderLine('x-{{spec.info.title | caseLower}}-warning');
         if ($warnings) {
-            foreach(explode(';', $warnings) as $warning) {
+            foreach (explode(';', $warnings) as $warning) {
                 \trigger_error($warning, E_USER_WARNING);
             }
         }
-        
-        if (str_starts_with($contentType, 'application/json')) {
+
+        if (str_starts_with($responseContentType, 'application/json')) {
             $responseBody = json_decode($responseBody, true);
         }
 
-        if (curl_errno($ch)) {
-            throw new {{ spec.namespace | split('\\') | last | caseUcfirst}}Exception(curl_error($ch), $responseStatus, $responseBody['type'] ?? '', $responseBody);
-        }
-
-        if($responseStatus >= 400) {
-            if(is_array($responseBody)) {
-                throw new {{ spec.namespace | split('\\') | last | caseUcfirst}}Exception($responseBody['message'], $responseStatus, $responseBody['type'] ?? '', json_encode($responseBody));
-            } else {
-                throw new {{ spec.namespace | split('\\') | last | caseUcfirst}}Exception($responseBody, $responseStatus, '', $responseBody);
+        if ($responseStatus >= 400) {
+            if (is_array($responseBody)) {
+                throw new {{ namespace | split('\\') | last | caseUcfirst}}Exception($responseBody['message'], $responseStatus, $responseBody['type'] ?? '', json_encode($responseBody));
             }
+            throw new {{ namespace | split('\\') | last | caseUcfirst}}Exception($responseBody, $responseStatus, '', $responseBody);
         }
 
         if ($responseType === 'location') {
-            return $responseHeaders['location'];
+            return $response->getHeaderLine('location');
         }
 
         return $responseBody;
@@ -355,20 +355,17 @@ class Client
     /**
      * Flatten params array to PHP multiple format
      *
-     * @param array $data
-     * @param string $prefix
-     * @return array
      */
-    protected function flatten(array $data, string $prefix = ''): array {
+    protected function flatten(array $data, string $prefix = ''): array
+    {
         $output = [];
 
-        foreach($data as $key => $value) {
+        foreach ($data as $key => $value) {
             $finalKey = $prefix ? "{$prefix}[{$key}]" : $key;
 
             if (is_array($value)) {
                 $output = array_merge($output, $this->flatten($value, $finalKey));
-            }
-            else {
+            } else {
                 $output[$finalKey] = $value;
             }
         }
@@ -379,13 +376,11 @@ class Client
     /**
      * Prepare params for JSON encoding by converting model objects to arrays
      *
-     * @param mixed $data
-     * @return mixed
      */
     protected function prepareParams($data)
     {
         if (is_array($data)) {
-            return array_map([$this, 'prepareParams'], $data);
+            return array_map($this->prepareParams(...), $data);
         }
 
         if (is_object($data) && method_exists($data, 'toArray')) {
@@ -393,5 +388,87 @@ class Client
         }
 
         return $data;
+    }
+
+    /**
+     * Convert flattened params into Utopia multipart parts.
+     *
+     * @param array<array-key, mixed> $data
+     * @return array<array-key, scalar|Part>
+     */
+    protected function toMultipartParts(array $data): array
+    {
+        $parts = [];
+
+        foreach ($this->flatten($data) as $name => $value) {
+            $name = (string) $name;
+
+            if ($value instanceof Part) {
+                $parts[$name] = $value;
+                continue;
+            }
+
+            if ($value instanceof \CURLFile) {
+                $path = $value->getFilename();
+                $filename = $value->getPostFilename() !== '' ? $value->getPostFilename() : null;
+                $mimeType = $value->getMimeType() !== '' ? $value->getMimeType() : null;
+
+                if (is_file($path)) {
+                    $parts[$name] = Part::file($name, $path, $filename, $mimeType);
+                } else {
+                    $contents = @file_get_contents($path);
+                    $parts[$name] = Part::body($name, $contents === false ? '' : $contents, $filename, $mimeType);
+                }
+
+                continue;
+            }
+
+            $parts[$name] = $value;
+        }
+
+        return $parts;
+    }
+
+    protected function getHttpClient(bool $followRedirects): ClientInterface
+    {
+        if ($this->transport instanceof ClientInterface) {
+            return $this->transport;
+        }
+
+        if ($followRedirects) {
+            return $this->httpClient ??= $this->createHttpClient(true);
+        }
+
+        return $this->httpClientNoRedirect ??= $this->createHttpClient(false);
+    }
+
+    protected function resetHttpClient(): void
+    {
+        $this->httpClient = null;
+        $this->httpClientNoRedirect = null;
+    }
+
+    protected function createHttpClient(bool $followRedirects): HttpClient
+    {
+        $adapter = new CurlAdapter(options: [
+            CURLOPT_TIMEOUT_MS => 0,
+            CURLOPT_USERAGENT => php_uname('s') . '-' . php_uname('r') . ':{{ language.name | caseLower }}-' . phpversion(),
+        ])->withConnectionReuse();
+
+        $client = new HttpClient($adapter)->withFollowRedirects($followRedirects);
+
+        if ($this->selfSigned) {
+            $client = $client->withSslVerification(false);
+        }
+
+        if ($this->timeout !== null) {
+            $client = $client->withTimeout($this->timeout);
+        }
+
+        if ($this->connectTimeout !== null) {
+            return $client->withConnectTimeout($this->connectTimeout);
+        }
+
+        return $client;
     }
 }

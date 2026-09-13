@@ -4,7 +4,8 @@
 #
 # Usage:
 #   ./scripts/update-lockfiles.sh           # update all
-#   ./scripts/update-lockfiles.sh web       # update one (web | node | react-native | cli)
+#   ./scripts/update-lockfiles.sh web       # update one (web | node | react-native)
+#   ./scripts/update-lockfiles.sh renovate  # update lock files and regenerate examples
 
 set -euo pipefail
 
@@ -13,9 +14,40 @@ TARGET="${1:-all}"
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"' EXIT
 
+ensure_tool() {
+    local command_name="$1" tool_name="$2" version="${3:-}"
+
+    if command -v "$command_name" >/dev/null 2>&1; then
+        return
+    fi
+
+    if ! command -v install-tool >/dev/null 2>&1; then
+        echo "ERROR: required command '$command_name' is missing" >&2
+        return 1
+    fi
+
+    if [ -n "$version" ]; then
+        install-tool "$tool_name" "$version"
+    else
+        install-tool "$tool_name"
+    fi
+}
+
+ensure_npm() {
+    ensure_tool npm node "${SDK_GEN_NODE_VERSION:-24.18.0}"
+}
+
+ensure_php() {
+    ensure_tool php php "${SDK_GEN_PHP_VERSION:-8.5.0}"
+}
+
+ensure_composer() {
+    ensure_tool composer composer "${SDK_GEN_COMPOSER_VERSION:-2.10.2}"
+}
+
 strip_twig() {
-    # Replace {{ ... }} expressions with a safe placeholder so npm/bun
-    # can parse the file as plain JSON. Only metadata fields use Twig
+    # Replace {{ ... }} expressions with a safe placeholder so npm can parse
+    # the file as plain JSON. Only metadata fields use Twig
     # vars; dependency versions are all static.
     sed 's/{{[^}]*}}/PLACEHOLDER/g' "$1"
 }
@@ -74,21 +106,14 @@ restore_twig_npm() {
     replace_first "$lockfile" '"license": "PLACEHOLDER"' '"license": "{{ sdk.license }}"'
 }
 
-restore_twig_bun() {
-    # Replace PLACEHOLDER in bun.lock with the correct Twig expression.
-    local lockfile="$1"
-    local twig_name="$2"
-
-    replace_first "$lockfile" '"name": "PLACEHOLDER"' "\"name\": \"${twig_name}\""
-    validate_no_placeholders "$lockfile"
-}
-
 update_npm() {
     local lang="$1"
     local twig_name="$2"
     local template="$ROOT/templates/$lang/package.json.twig"
     local dest="$ROOT/templates/$lang/package-lock.json.twig"
     local dir="$WORKDIR/$lang"
+
+    ensure_npm
 
     echo "→ $lang (npm)"
     mkdir -p "$dir"
@@ -100,26 +125,31 @@ update_npm() {
     echo "  updated templates/$lang/package-lock.json.twig"
 }
 
-update_bun() {
-    local twig_name="$1"
-    local dir="$WORKDIR/cli"
-    local template="$ROOT/templates/cli/package.json.twig"
-    local dest="$ROOT/templates/cli/bun.lock.twig"
-
-    echo "→ cli (bun)"
-    mkdir -p "$dir"
-    strip_twig "$template" > "$dir/package.json"
-    cd "$dir" && bun install --silent 2>/dev/null
-    cp "$dir/bun.lock" "$dest"
-    restore_twig_bun "$dest" "$twig_name"
-    echo "  updated templates/cli/bun.lock.twig"
+update_all() {
+    update_npm web "{{ language.params.npmPackage }}"
+    validate_no_placeholders "$ROOT/templates/web/package-lock.json.twig"
+    update_npm node "{{ language.params.npmPackage | caseDash }}"
+    validate_no_placeholders "$ROOT/templates/node/package-lock.json.twig"
+    update_npm react-native "{{ language.params.npmPackage }}"
+    validate_no_placeholders "$ROOT/templates/react-native/package-lock.json.twig"
 }
 
-restore_cli_bin() {
-    replace_first "$ROOT/templates/cli/package-lock.json.twig" \
-        '"PLACEHOLDER": "dist/cli.cjs"' \
-        '"{{ language.params.executableName|caseLower }}": "dist/cli.cjs"'
-    validate_no_placeholders "$ROOT/templates/cli/package-lock.json.twig"
+regenerate_examples() {
+    cd "$ROOT"
+
+    ensure_php
+    ensure_composer
+
+    if [ ! -f vendor/autoload.php ]; then
+        composer install --ignore-platform-reqs --no-interaction --prefer-dist
+    fi
+
+    php example.php
+
+    if grep -R '"PLACEHOLDER"' "$ROOT"/templates/*/*lock*.twig >/dev/null 2>&1; then
+        echo "ERROR: unresolved PLACEHOLDER values remain in generated lockfile templates" >&2
+        exit 1
+    fi
 }
 
 case "$TARGET" in
@@ -135,24 +165,15 @@ case "$TARGET" in
         update_npm react-native "{{ language.params.npmPackage }}"
         validate_no_placeholders "$ROOT/templates/react-native/package-lock.json.twig"
         ;;
-    cli)
-        update_npm cli "{{ language.params.npmPackage|caseDash }}"
-        restore_cli_bin
-        update_bun "{{ language.params.npmPackage|caseDash }}"
-        ;;
     all)
-        update_npm web "{{ language.params.npmPackage }}"
-        validate_no_placeholders "$ROOT/templates/web/package-lock.json.twig"
-        update_npm node "{{ language.params.npmPackage | caseDash }}"
-        validate_no_placeholders "$ROOT/templates/node/package-lock.json.twig"
-        update_npm react-native "{{ language.params.npmPackage }}"
-        validate_no_placeholders "$ROOT/templates/react-native/package-lock.json.twig"
-        update_npm cli "{{ language.params.npmPackage|caseDash }}"
-        restore_cli_bin
-        update_bun "{{ language.params.npmPackage|caseDash }}"
+        update_all
+        ;;
+    renovate)
+        update_all
+        regenerate_examples
         ;;
     *)
-        echo "Unknown target: $TARGET. Use web | node | react-native | cli | all"
+        echo "Unknown target: $TARGET. Use web | node | react-native | all | renovate"
         exit 1
         ;;
 esac

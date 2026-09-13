@@ -8,7 +8,7 @@ using UnityEngine;
 using System.Runtime.InteropServices;
 #endif
 
-namespace {{ spec.title | caseUcfirst }}
+namespace {{ spec.info.title | caseUcfirst }}
 {
     /// <summary>
     /// Simple cookie container for Unity WebRequest
@@ -65,7 +65,7 @@ namespace {{ spec.title | caseUcfirst }}
         private readonly List<Cookie> _cookies = new List<Cookie>();
         private readonly object _lock = new object();
 
-        private const string CookiePrefsKey = "{{ spec.title | caseUcfirst }}_Cookies";
+        private const string CookiePrefsKey = "{{ spec.info.title | caseUcfirst }}_Cookies";
 #if UNITY_WEBGL && !UNITY_EDITOR
         [DllImport("__Internal")]
         private static extern void EnableWebGLHttpCredentials(int enable);
@@ -96,7 +96,7 @@ namespace {{ spec.title | caseUcfirst }}
         private void AddCookie(Cookie cookie)
         {
             if (cookie?.Name == null) return;
-            
+
             lock (_lock)
             {
                 // Remove existing cookie with the same name, domain, and path
@@ -135,7 +135,7 @@ namespace {{ spec.title | caseUcfirst }}
         /// <summary>
         /// Get cookie header string for request
         /// </summary>
-        public string GetCookieHeader(string domain, string path = "/") => 
+        public string GetCookieHeader(string domain, string path = "/") =>
             string.Join("; ", GetCookies(domain, path)
                 .Select(c => $"{c.Name}={c.Value}"));
 
@@ -157,7 +157,7 @@ namespace {{ spec.title | caseUcfirst }}
             if (string.IsNullOrWhiteSpace(setCookieHeader) || string.IsNullOrWhiteSpace(domain)) return;
             ParseCookie(setCookieHeader.Trim(), domain);
         }
-        
+
         /// <summary>
         /// Parse a single cookie string
         /// </summary>
@@ -235,7 +235,7 @@ namespace {{ spec.title | caseUcfirst }}
         /// <summary>
         /// Remove expired cookies (must be called within lock)
         /// </summary>
-        private void CleanExpiredCookies() => 
+        private void CleanExpiredCookies() =>
             _cookies.RemoveAll(c => c == null || c.IsExpired);
 
         /// <summary>

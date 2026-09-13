@@ -1,11 +1,12 @@
 package {{ sdk.namespace | caseDot }}.services
 
-import {{ sdk.namespace | caseDot }}.Service
-import {{ sdk.namespace | caseDot }}.Client
+import android.util.Log
 import {{ sdk.namespace | caseDot }}.Channel
+import {{ sdk.namespace | caseDot }}.Client
 import {{ sdk.namespace | caseDot }}.ID
 import {{ sdk.namespace | caseDot }}.Query
-import {{ sdk.namespace | caseDot }}.exceptions.{{ spec.title | caseUcfirst }}Exception
+import {{ sdk.namespace | caseDot }}.Service
+import {{ sdk.namespace | caseDot }}.exceptions.{{ spec.info.title | caseUcfirst }}Exception
 import {{ sdk.namespace | caseDot }}.extensions.forEachAsync
 import {{ sdk.namespace | caseDot }}.extensions.fromJson
 import {{ sdk.namespace | caseDot }}.extensions.jsonCast
@@ -18,8 +19,8 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
-import android.util.Log
 import kotlin.coroutines.CoroutineContext
 
 class Realtime(client: Client) : Service(client), CoroutineScope {
@@ -49,6 +50,34 @@ class Realtime(client: Client) : Service(client), CoroutineScope {
 
         private val subscriptionLock = Any()
         private val presenceLock = Any()
+
+        private val onErrorCallbacks = CopyOnWriteArrayList<(Throwable?, Int?) -> Unit>()
+        private val onCloseCallbacks = CopyOnWriteArrayList<() -> Unit>()
+        private val onOpenCallbacks = CopyOnWriteArrayList<() -> Unit>()
+    }
+
+    fun onError(callback: (error: Throwable?, statusCode: Int?) -> Unit) {
+        onErrorCallbacks.add(callback)
+    }
+
+    fun onClose(callback: () -> Unit) {
+        onCloseCallbacks.add(callback)
+    }
+
+    fun onOpen(callback: () -> Unit) {
+        onOpenCallbacks.add(callback)
+    }
+
+    private fun dispatchError(error: Throwable?, statusCode: Int?) {
+        onErrorCallbacks.forEach { runCatching { it(error, statusCode) } }
+    }
+
+    private fun dispatchClose() {
+        onCloseCallbacks.forEach { runCatching { it() } }
+    }
+
+    private fun dispatchOpen() {
+        onOpenCallbacks.forEach { runCatching { it() } }
     }
 
     private fun createSocket() {
@@ -73,10 +102,15 @@ class Realtime(client: Client) : Service(client), CoroutineScope {
             val encodedProject = java.net.URLEncoder.encode(client.config["project"].toString(), "UTF-8")
             val queryParams = "project=$encodedProject"
             val url = "${client.endpointRealtime}/realtime?$queryParams"
-            val request = Request.Builder().url(url).build()
+            val requestBuilder = Request.Builder().url(url)
+            val jwt = client.config["jwt"]
+            if (!jwt.isNullOrEmpty()) {
+                requestBuilder.addHeader("x-{{ spec.info.title | caseLower }}-jwt", jwt)
+            }
+            val request = requestBuilder.build()
 
             val generation = socketGeneration.incrementAndGet()
-            socket = client.http.newWebSocket(request, {{ spec.title | caseUcfirst }}WebSocketListener(generation))
+            socket = client.http.newWebSocket(request, {{ spec.info.title | caseUcfirst }}WebSocketListener(generation))
         }
     }
 
@@ -111,7 +145,7 @@ class Realtime(client: Client) : Service(client), CoroutineScope {
                 return id
             }
         }
-        throw {{ spec.title | caseUcfirst }}Exception("Failed to generate unique subscription id")
+        throw {{ spec.info.title | caseUcfirst }}Exception("Failed to generate unique subscription id")
     }
 
     private fun enqueuePendingSubscribeLocked(subscriptionId: String) {
@@ -139,6 +173,9 @@ class Realtime(client: Client) : Service(client), CoroutineScope {
             pendingPresence = null
         }
         appConnected = false
+        onErrorCallbacks.clear()
+        onCloseCallbacks.clear()
+        onOpenCallbacks.clear()
     }
 
     private fun sendPendingSubscribes() {
@@ -372,7 +409,7 @@ class Realtime(client: Client) : Service(client), CoroutineScope {
         )
     }
 
-    private inner class {{ spec.title | caseUcfirst }}WebSocketListener(
+    private inner class {{ spec.info.title | caseUcfirst }}WebSocketListener(
         private val generation: Int
     ) : WebSocketListener() {
 
@@ -385,6 +422,7 @@ class Realtime(client: Client) : Service(client), CoroutineScope {
             if (isStale(webSocket)) return
             reconnectAttempts = 0
             startHeartbeat()
+            dispatchOpen()
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
@@ -393,16 +431,21 @@ class Realtime(client: Client) : Service(client), CoroutineScope {
 
             launch(IO) {
                 if (isStale(webSocket)) return@launch
-                val message = text.fromJson<RealtimeResponse>()
-                when (message.type) {
-                    TYPE_ERROR -> handleResponseError(message)
-                    TYPE_CONNECTED -> handleResponseConnected(message)
-                    TYPE_EVENT -> handleResponseEvent(message)
-                    TYPE_PONG -> {}
+                try {
+                    val message = text.fromJson<RealtimeResponse>()
+                    when (message.type) {
+                        TYPE_ERROR -> handleResponseError(message)
+                        TYPE_CONNECTED -> handleResponseConnected(message)
+                        TYPE_EVENT -> handleResponseEvent(message)
+                        TYPE_PONG -> {}
+                    }
+                } catch (e: Throwable) {
+                    val statusCode = (e as? {{ spec.info.title | caseUcfirst }}Exception)?.code
+                    dispatchError(e, statusCode)
                 }
             }
         }
-        
+
         private fun handleResponseConnected(message: RealtimeResponse) {
             if (message.data == null) return
 
@@ -415,14 +458,14 @@ class Realtime(client: Client) : Service(client), CoroutineScope {
         }
 
         private fun handleResponseError(message: RealtimeResponse) {
-            val ex = message.data?.jsonCast<{{ spec.title | caseUcfirst }}Exception>() ?: RuntimeException("Data is not present")
+            val ex = message.data?.jsonCast<{{ spec.info.title | caseUcfirst }}Exception>() ?: RuntimeException("Data is not present")
             throw ex
         }
 
         private suspend fun handleResponseEvent(message: RealtimeResponse) {
             val messageData = message.data?.jsonCast<Map<String, Any>>() ?: return
             val event = messageData.jsonCast<RealtimeResponseEvent<Any>>()
-            
+
             if (event.channels.isEmpty()) {
                 return
             }
@@ -454,6 +497,7 @@ class Realtime(client: Client) : Service(client), CoroutineScope {
             synchronized(subscriptionLock) {
                 if (socket === webSocket) socket = null
             }
+            dispatchClose()
             if (!reconnect || code == RealtimeCode.POLICY_VIOLATION.value) {
                 reconnect = true
                 return
@@ -464,7 +508,7 @@ class Realtime(client: Client) : Service(client), CoroutineScope {
             Log.e(
                 this@Realtime::class.java.name,
                 "Realtime disconnected. Re-connecting in ${timeout / 1000} seconds.",
-                {{ spec.title | caseUcfirst }}Exception(reason, code)
+                {{ spec.info.title | caseUcfirst }}Exception(reason, code)
             )
 
             launch {
@@ -485,7 +529,7 @@ class Realtime(client: Client) : Service(client), CoroutineScope {
             synchronized(subscriptionLock) {
                 if (socket === webSocket) socket = null
             }
-            t.printStackTrace()
+            dispatchError(t, null)
         }
     }
 }

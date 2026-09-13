@@ -1,14 +1,15 @@
-            id_param_name = {% if method.parameters.all | filter(p => p.isUploadID) | length > 0 %}{% for parameter in method.parameters.all | filter(parameter => parameter.isUploadID) %}"{{ parameter.name }}"{% endfor %}{% else %}nil{% endif %}
+{% set uploadIdParameter = method | uploadIdParameter %}
+            id_param_name = {% if uploadIdParameter %}"{{ uploadIdParameter.name }}"{% else %}nil{% endif %}
 
-{% for parameter in method.parameters.all %}
-{% if parameter.type == 'file' %}
+{% for parameter in (method | parameters('all')) %}
+{% if (parameter | schemaType) == 'file' %}
             param_name = '{{ parameter.name }}'
 
 {% endif %}
 {% endfor %}
 {% set responseModels = method | getValidResponseModels %}
-{% set hasResponseDiscriminator = method.responseDiscriminator is defined and method.responseDiscriminator is not empty %}
-{% set responseDiscriminator = method.responseDiscriminator ?? {} %}
+{% set hasResponseDiscriminator = (method | responseDiscriminator) is not empty %}
+{% set responseDiscriminator = (method | responseDiscriminator) %}
 {% if responseModels|length > 1 and hasResponseDiscriminator %}
             response = @client.chunked_upload(
                 path: api_path,
@@ -30,7 +31,7 @@
 {% endfor %}
 
             raise Exception, "Unable to match response to any expected response model"
-{% else %}
+{%- else %}
             @client.chunked_upload(
                 path: api_path,
                 headers: api_headers,
@@ -38,8 +39,8 @@
                 param_name: param_name,
                 id_param_name: id_param_name,
                 on_progress: on_progress,
-{% if method.responseModel and method.responseModel != 'any' %}
-                response_type: Models::{{method.responseModel | caseUcfirst}}
+{% if (method | responseModel) and (method | responseModel) != 'any' %}
+                response_type: Models::{{(method | responseModel) | caseUcfirst}}
 {% endif %}
             )
-{% endif %}
+{%- endif %}

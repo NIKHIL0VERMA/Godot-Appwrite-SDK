@@ -2,6 +2,14 @@
 
 namespace Appwrite\SDK\Language;
 
+use Utopia\OpenAPI\Model\ArraySchema;
+use Utopia\OpenAPI\Model\ObjectSchema;
+use Utopia\OpenAPI\Model\Operation;
+use Utopia\OpenAPI\Model\Parameter;
+use Utopia\OpenAPI\Model\Schema;
+use Utopia\OpenAPI\Model\StringSchema;
+use Utopia\OpenAPI\Model\Tag;
+use Utopia\OpenAPI\Specification;
 use stdClass;
 use Override;
 use Appwrite\SDK\Language;
@@ -10,6 +18,12 @@ use Twig\TwigFilter;
 
 class Python extends Language
 {
+    /**
+     * Black's line length for generated SDKs, kept in step with the `[tool.black]`
+     * block in `templates/python/pyproject.toml.twig`.
+     */
+    public const int LINE_LENGTH = 120;
+
     #[Override]
     protected $params = [
         'pipPackage' => 'packageName',
@@ -133,7 +147,7 @@ class Python extends Language
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/__init__.py',
+                'destination' => '{{ namespace | caseSnake}}/__init__.py',
                 'template' => 'python/package/__init__.py.twig',
             ],
             [
@@ -143,22 +157,22 @@ class Python extends Language
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/utils/deprecated.py',
+                'destination' => '{{ namespace | caseSnake}}/utils/deprecated.py',
                 'template' => 'python/package/utils/deprecated.py.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/utils/__init__.py',
+                'destination' => '{{ namespace | caseSnake}}/utils/__init__.py',
                 'template' => 'python/package/utils/__init__.py.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/client.py',
+                'destination' => '{{ namespace | caseSnake}}/client.py',
                 'template' => 'python/package/client.py.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/permission.py',
+                'destination' => '{{ namespace | caseSnake}}/permission.py',
                 'template' => 'python/package/permission.py.twig',
             ],
             [
@@ -168,7 +182,7 @@ class Python extends Language
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/role.py',
+                'destination' => '{{ namespace | caseSnake}}/role.py',
                 'template' => 'python/package/role.py.twig',
             ],
             [
@@ -178,7 +192,7 @@ class Python extends Language
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/id.py',
+                'destination' => '{{ namespace | caseSnake}}/id.py',
                 'template' => 'python/package/id.py.twig',
             ],
             [
@@ -188,7 +202,7 @@ class Python extends Language
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/query.py',
+                'destination' => '{{ namespace | caseSnake}}/query.py',
                 'template' => 'python/package/query.py.twig',
             ],
             [
@@ -198,7 +212,7 @@ class Python extends Language
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/operator.py',
+                'destination' => '{{ namespace | caseSnake}}/operator.py',
                 'template' => 'python/package/operator.py.twig',
             ],
             [
@@ -208,42 +222,42 @@ class Python extends Language
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/exception.py',
+                'destination' => '{{ namespace | caseSnake}}/exception.py',
                 'template' => 'python/package/exception.py.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/input_file.py',
+                'destination' => '{{ namespace | caseSnake}}/input_file.py',
                 'template' => 'python/package/input_file.py.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/service.py',
+                'destination' => '{{ namespace | caseSnake}}/service.py',
                 'template' => 'python/package/service.py.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/models/__init__.py',
+                'destination' => '{{ namespace | caseSnake}}/models/__init__.py',
                 'template' => 'python/package/models/__init__.py.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/models/base_model.py',
+                'destination' => '{{ namespace | caseSnake}}/models/base_model.py',
                 'template' => 'python/package/models/base_model.py.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/services/__init__.py',
+                'destination' => '{{ namespace | caseSnake}}/services/__init__.py',
                 'template' => 'python/package/services/__init__.py.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/encoders/__init__.py',
+                'destination' => '{{ namespace | caseSnake}}/encoders/__init__.py',
                 'template' => 'python/package/services/__init__.py.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/enums/__init__.py',
+                'destination' => '{{ namespace | caseSnake}}/enums/__init__.py',
                 'template' => 'python/package/services/__init__.py.twig',
             ],
             [
@@ -253,17 +267,17 @@ class Python extends Language
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/encoders/value_class_encoder.py',
+                'destination' => '{{ namespace | caseSnake}}/encoders/value_class_encoder.py',
                 'template' => 'python/package/encoders/value_class_encoder.py.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/encoders/__init__.py',
+                'destination' => '{{ namespace | caseSnake}}/encoders/__init__.py',
                 'template' => 'python/package/encoders/__init__.py.twig',
             ],
             [
                 'scope' => 'service',
-                'destination' => '{{ spec.title | caseSnake}}/services/{{service.name | caseSnake}}.py',
+                'destination' => '{{ namespace | caseSnake}}/services/{{service.name | caseSnake}}.py',
                 'template' => 'python/package/services/service.py.twig',
             ],
             [
@@ -273,7 +287,7 @@ class Python extends Language
             ],
             [
                 'scope' => 'method',
-                'destination' => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
+                'destination' => 'docs/examples/{{service.name | caseLower}}/{{(method | methodName) | caseKebab}}.md',
                 'template' => 'python/docs/example.md.twig',
             ],
             [
@@ -283,95 +297,102 @@ class Python extends Language
             ],
             [
                 'scope' => 'enum',
-                'destination' => '{{ spec.title | caseSnake}}/enums/{{ enum.name | caseSnake }}.py',
+                'destination' => '{{ namespace | caseSnake}}/enums/{{ enum.title | caseSnake }}.py',
                 'template' => 'python/package/enums/enum.py.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => '{{ spec.title | caseSnake}}/enums/__init__.py',
+                'destination' => '{{ namespace | caseSnake}}/enums/__init__.py',
                 'template' => 'python/package/enums/__init__.py.twig',
             ],
             [
                 'scope' => 'requestModel',
-                'destination' => '{{ spec.title | caseSnake}}/models/{{ requestModel.name | caseSnake }}.py',
+                'destination' => '{{ namespace | caseSnake}}/models/{{ requestModelName | caseSnake }}.py',
                 'template' => 'python/package/models/request_model.py.twig',
             ],
             [
                 'scope' => 'definition',
-                'destination' => '{{ spec.title | caseSnake}}/models/{{ definition.name | caseSnake }}.py',
+                'destination' => '{{ namespace | caseSnake}}/models/{{ definitionName | caseSnake }}.py',
                 'template' => 'python/package/models/model.py.twig',
             ],
         ];
     }
 
     /**
-     * @throws Exception
+     * The annotation for a model property.
+     *
+     * A list of models keeps its element type, because the decoder builds each
+     * element into that model. Any other list is annotated `List[Any]`: the
+     * element type is not enforced on the way in, and narrowing it would be a
+     * stricter contract than the published SDKs declare.
      */
-    public function getTypeName(array $parameter, array $spec = []): string
+    protected function getModelPropertyType(Schema $value, Specification $spec): string
     {
-        $typeName = '';
-
         if (
-            ($parameter['type'] ?? null) === self::TYPE_ARRAY
-            && (isset($parameter['enumName']) || !empty($parameter['enumValues']))
+            $value instanceof ArraySchema
+            && $this->getSchemaModels($value) === []
+            && !$this->usesEnumType($value)
         ) {
-            $enumType = isset($parameter['enumName'])
-                ? \ucfirst($parameter['enumName'])
-                : \ucfirst((string) $parameter['name']);
-
-            $typeName = 'List[' . $enumType . ']';
-        } elseif (isset($parameter['enumName'])) {
-            $typeName = \ucfirst($parameter['enumName']);
-        } elseif (!empty($parameter['enumValues'])) {
-            $typeName = \ucfirst((string) $parameter['name']);
-        } elseif (!empty($parameter['array']['model'])) {
-            $typeName = 'List[' . $this->toPascalCase($parameter['array']['model']) . ']';
-        } elseif (!empty($parameter['model'])) {
-            $modelType = $this->toPascalCase($parameter['model']);
-            $typeName = $parameter['type'] === self::TYPE_ARRAY ? 'List[' . $modelType . ']' : $modelType;
-        } else {
-            switch ($parameter['type'] ?? '') {
-                case self::TYPE_FILE:
-                    $typeName = 'InputFile';
-                    break;
-                case self::TYPE_NUMBER:
-                case self::TYPE_INTEGER:
-                    $typeName = 'float';
-                    break;
-                case self::TYPE_BOOLEAN:
-                    $typeName = 'bool';
-                    break;
-                case self::TYPE_STRING:
-                    $typeName = 'str';
-                    break;
-                case self::TYPE_ARRAY:
-                    if (!empty(($parameter['array'] ?? [])['type']) && !\is_array($parameter['array']['type'])) {
-                        $typeName = 'List[' . $this->getTypeName($parameter['array']) . ']';
-                    } else {
-                        $typeName = 'List[Any]';
-                    }
-                    break;
-                case self::TYPE_OBJECT:
-                    $typeName = 'Dict[str, Any]';
-                    break;
-                default:
-                    $typeName = $parameter['type'];
-                    break;
-            }
+            return 'List[Any]';
         }
 
-        if (!($parameter['required'] ?? true) || ($parameter['nullable'] ?? false)) {
+        return $this->getBaseTypeName($value, $spec);
+    }
+
+    public function getTypeName(Schema|Parameter $parameter, ?Specification $spec = null): string
+    {
+        $schema = $this->getSchema($parameter);
+        $typeName = $this->getBaseTypeName($parameter, $spec);
+
+        if (($parameter instanceof Parameter && !$parameter->required) || $schema->nullable) {
             return 'Optional[' . $typeName . ']';
+        }
+        return $typeName;
+    }
+
+    /**
+     * The annotation without any Optional wrapping.
+     *
+     * Model rendering decides optionality itself, from the declaring schema's
+     * required list, so it needs the bare type.
+     */
+    protected function getBaseTypeName(Schema|Parameter $parameter, ?Specification $spec = null): string
+    {
+        $schema = $this->getSchema($parameter);
+        if ($this->usesEnumType($parameter)) {
+            $typeName = $this->toPascalCase($this->getSchemaEnumName($parameter, $spec));
+            if ($schema instanceof ArraySchema) {
+                $typeName = 'List[' . $typeName . ']';
+            }
+        } elseif (($models = $this->getSchemaModels($parameter)) !== []) {
+            $typeName = \count($models) > 1
+                ? 'Union[' . \implode(', ', \array_map($this->toPascalCase(...), $models)) . ']'
+                : $this->toPascalCase($models[0]);
+            if ($schema instanceof ArraySchema) {
+                $typeName = 'List[' . $typeName . ']';
+            }
+        } else {
+            $typeName = match ($this->getSchemaType($parameter)) {
+                self::TYPE_FILE => 'InputFile',
+                self::TYPE_NUMBER, self::TYPE_INTEGER => 'float',
+                self::TYPE_BOOLEAN => 'bool',
+                self::TYPE_STRING => 'str',
+                self::TYPE_ARRAY => $this->isUntypedNestedArray($parameter, $schema)
+                ? 'List[List[Any]]'
+                : 'List[' . $this->getTypeName($this->getArraySchema($parameter) ?? $schema) . ']',
+                self::TYPE_OBJECT => 'Dict[str, Any]',
+                default => 'Any',
+            };
         }
 
         return $typeName;
     }
 
-    public function getParamDefault(array $param): string
+    public function getParamDefault(Schema|Parameter $param): string
     {
-        $type = $param['type'] ?? '';
-        $default = $param['default'] ?? '';
-        $required = $param['required'] ?? '';
+        $type = $this->getSchemaType($param);
+        $default = $this->getSchemaDefault($param);
+        $required = ($param instanceof Parameter && $param->required);
 
         if ($required) {
             return '';
@@ -420,10 +441,10 @@ class Python extends Language
         return $output;
     }
 
-    public function getParamExample(array $param, string $lang = '', array $spec = []): string
+    public function getParamExample(Schema|Parameter $param, string $lang = '', array $spec = []): string
     {
-        $type = $param['type'] ?? '';
-        $example = $param['example'] ?? '';
+        $type = $this->getSchemaType($param);
+        $example = $this->getSchemaExample($param);
 
         $hasExample = !empty($example) || $example === 0 || $example === false;
 
@@ -450,308 +471,506 @@ class Python extends Language
         };
     }
 
-    protected function getRequestModelDefinition(string $modelName, array $spec): ?array
+    protected function hasGenericType(string $model, Specification $spec): bool
     {
-        foreach (($spec['requestModels'] ?? []) as $requestModel) {
-            if (($requestModel['name'] ?? '') === $modelName) {
-                return $requestModel;
+        return $this->hasGenericSchemaType($model, $spec);
+    }
+
+    /** @param array<string, Schema> $properties */
+    protected function hasGenericTypeProperty(array $properties, Specification $spec): bool
+    {
+        return array_any($properties, function (Schema $property) use ($spec): bool {
+            $model = $this->getSchemaModel($property);
+            return $model !== null && $this->hasGenericType($model, $spec);
+        });
+    }
+
+    protected function normalizeModelFieldName(string $name): string
+    {
+        $name = $this->toSnakeCase(\ltrim($name, '$'));
+        return $this->escapeKeyword($name !== '' ? $name : 'value');
+    }
+
+    /** @param array<string, Schema> $properties */
+    protected function getModelFieldName(Schema $property, array $properties): string
+    {
+        $propertyName = 'value';
+        foreach ($properties as $name => $candidate) {
+            if ($candidate === $property) {
+                $propertyName = $name;
+                break;
             }
         }
 
-        return null;
+        $baseName = $this->normalizeModelFieldName($propertyName);
+        $index = 0;
+        foreach ($properties as $name => $candidate) {
+            if ($this->normalizeModelFieldName($name) !== $baseName) {
+                continue;
+            }
+            $index++;
+            if ($candidate === $property) {
+                break;
+            }
+        }
+
+        return $index <= 1 ? $baseName : $baseName . '_' . $index;
+    }
+
+    protected function getServiceEnumName(Parameter $parameter, Specification $spec): string
+    {
+        return $this->toPascalCase($this->getSchemaEnumName($parameter, $spec));
+    }
+
+    /**
+     * The response type as it appears in a service docstring.
+     *
+     * Must stay identical to the `-> ...` annotation the service template
+     * emits: a multi-model response is a `Union[...]`, and a model whose name
+     * collides with its own service is imported under a `Model` suffix.
+     */
+    protected function getResponseType(Operation $method, string $serviceName = ''): string
+    {
+        $models = \array_filter(
+            $this->getOperationResponseModels($method),
+            static fn(string $model): bool => $model !== '' && $model !== 'any'
+        );
+        if ($models === []) {
+            return 'Any';
+        }
+
+        $names = \array_map(
+            fn(string $model): string => $this->getServiceModelTypeName($model, $serviceName),
+            \array_values($models)
+        );
+
+        return \count($names) > 1 ? 'Union[' . \implode(', ', $names) . ']' : $names[0];
+    }
+
+    protected function getServiceModelTypeName(string $model, string $serviceName): string
+    {
+        $name = $this->toPascalCase($model);
+        return $serviceName !== '' && $name === $this->toPascalCase($serviceName)
+            ? $name . 'Model'
+            : $name;
+    }
+
+    protected function getServicePropertyType(Schema|Parameter $value, Specification $spec): string
+    {
+        $type = $this->getTypeName($value, $spec);
+        if (!$value instanceof Parameter || !$this->usesEnumType($value)) {
+            return $type;
+        }
+
+        $enumName = $this->toPascalCase($this->getSchemaEnumName($value, $spec));
+        return \str_replace($enumName, $this->getServiceEnumName($value, $spec), $type);
     }
 
     protected function getDocsModelTypeName(string $modelName, string $serviceName = ''): string
     {
-        $modelType = $this->getModelName($modelName);
-
-        if ($serviceName !== '' && $modelType === $this->getModelName($serviceName)) {
-            return $modelType . 'Model';
-        }
-
-        return $modelType;
+        $modelType = $this->toPascalCase($modelName);
+        return $serviceName !== '' && $modelType === $this->toPascalCase($serviceName)
+            ? $modelType . 'Model'
+            : $modelType;
     }
 
-    protected function getRequestModelPropertyExample(array $property, array $spec, string $serviceName = ''): string
+    protected function getRequestModelPropertyExample(Schema $property, Specification $spec, string $serviceName): string
     {
-        if (!empty($property['sub_schema'])) {
-            $example = $this->getRequestModelInstanceExample($property['sub_schema'], $spec, $serviceName);
-
-            return ($property['type'] ?? '') === self::TYPE_ARRAY ? '[' . $example . ']' : $example;
-        }
-
-        if (!empty($property['sub_schemas'])) {
-            $example = $this->getRequestModelInstanceExample($property['sub_schemas'][0], $spec, $serviceName);
-
-            return ($property['type'] ?? '') === self::TYPE_ARRAY ? '[' . $example . ']' : $example;
+        $models = $this->getSchemaModels($property);
+        if ($models !== []) {
+            $example = $this->getRequestModelInstanceExample($models[0], $spec, $serviceName);
+            return $property instanceof ArraySchema ? '[' . $example . ']' : $example;
         }
 
         return $this->getParamExample($property);
     }
 
-    protected function getRequestModelInstanceExample(string $modelName, array $spec, string $serviceName = ''): string
+    protected function getRequestModelInstanceExample(string $modelName, Specification $spec, string $serviceName): string
     {
-        $requestModel = $this->getRequestModelDefinition($modelName, $spec);
-
-        if ($requestModel === null) {
+        $model = $spec->schemas[$modelName] ?? null;
+        if (!$model instanceof ObjectSchema) {
             return $this->getDocsModelTypeName($modelName, $serviceName) . '()';
         }
 
         $arguments = [];
-
-        foreach (($requestModel['properties'] ?? []) as $property) {
-            $arguments[] = $this->getModelFieldName($property, $requestModel['properties']) . ' = ' . $this->getRequestModelPropertyExample($property, $spec, $serviceName);
+        foreach ($model->properties as $property) {
+            $arguments[] = $this->getModelFieldName($property, $model->properties)
+                . ' = ' . $this->getRequestModelPropertyExample($property, $spec, $serviceName);
         }
 
-        return $this->getDocsModelTypeName($modelName, $serviceName) . '(' . implode(', ', $arguments) . ')';
+        return $this->getDocsModelTypeName($modelName, $serviceName) . '(' . \implode(', ', $arguments) . ')';
     }
 
-    protected function getRequestModelExample(array $parameter, array $spec, string $serviceName = ''): string
+    protected function getRequestModelExample(Parameter $parameter, Specification $spec, string $serviceName): string
     {
-        $modelName = $parameter['model'] ?? (($parameter['array'] ?? [])['model'] ?? null);
-
-        if (empty($modelName)) {
+        $modelName = $this->getSchemaModel($parameter);
+        if ($modelName === null) {
             return $this->getParamExample($parameter);
         }
 
         $example = $this->getRequestModelInstanceExample($modelName, $spec, $serviceName);
-
-        if (($parameter['type'] ?? '') === self::TYPE_ARRAY) {
-            return '[' . $example . ']';
-        }
-
-        return $example;
+        return $this->getSchema($parameter) instanceof ArraySchema ? '[' . $example . ']' : $example;
     }
 
-    protected function getModelName(string $name): string
+    /** @param array<string, true> $visited */
+    protected function getResponseModelExample(?string $modelName, Specification $spec, array $visited = []): object
     {
-        return $this->toPascalCase($name);
-    }
-
-    protected function getUnionType(array $types): string
-    {
-        $types = array_values(array_unique(array_filter($types)));
-
-        if ($types === []) {
-            return 'Any';
+        if ($modelName === null || isset($visited[$modelName])) {
+            return new stdClass();
         }
 
-        if (count($types) === 1) {
-            return $types[0];
+        $model = $spec->schemas[$modelName] ?? null;
+        if (!$model instanceof ObjectSchema) {
+            return new stdClass();
         }
 
-        return 'Union[' . implode(', ', $types) . ']';
-    }
-
-    protected function normalizeModelFieldName(string $name): string
-    {
-        $name = ltrim($name, '$');
-        $name = $this->toSnakeCase($name);
-
-        if ($name === '') {
-            $name = 'value';
-        }
-
-        return $this->escapeKeyword($name);
-    }
-
-    protected function getModelFieldName(array $property, array $properties): string
-    {
-        $propertyName = $property['name'] ?? 'value';
-        $baseName = $this->normalizeModelFieldName($propertyName);
-        $index = 0;
-
-        foreach ($properties as $candidate) {
-            if ($this->normalizeModelFieldName($candidate['name'] ?? 'value') !== $baseName) {
-                continue;
-            }
-
-            $index++;
-
-            if (($candidate['name'] ?? null) === $propertyName) {
-                break;
-            }
-        }
-
-        if ($index <= 1) {
-            return $baseName;
-        }
-
-        return $baseName . '_' . $index;
-    }
-
-    protected function getModelPropertyType(array $property, string $ownerName = ''): string
-    {
-        $wrapNullable = function (string $type) use ($property): string {
-            if ($property['nullable'] ?? false) {
-                return 'Optional[' . $type . ']';
-            }
-
-            return $type;
-        };
-
-        if (!empty($property['sub_schemas'])) {
-            $unionType = $this->getUnionType(array_map(
-                $this->getModelName(...),
-                $property['sub_schemas']
-            ));
-
-            return $wrapNullable(($property['type'] ?? '') === self::TYPE_ARRAY
-                ? 'List[' . $unionType . ']'
-                : $unionType);
-        }
-
-        if (!empty($property['sub_schema'])) {
-            $modelType = $this->getModelName($property['sub_schema']);
-
-            return $wrapNullable(($property['type'] ?? '') === self::TYPE_ARRAY
-                ? 'List[' . $modelType . ']'
-                : $modelType);
-        }
-
-        if (
-            ($property['type'] ?? null) === self::TYPE_ARRAY
-            && !empty($property['items']['enum'])
-        ) {
-            $enumType = $this->getModelName($property['x-enum-name'] ?? (($ownerName ?: 'Model') . ucfirst($property['name'] ?? 'Value')));
-
-            return $wrapNullable('List[' . $enumType . ']');
-        }
-
-        if (!empty($property['enum'])) {
-            $enumType = $this->getModelName($property['enumName'] ?? $property['x-enum-name'] ?? (($ownerName ?: 'Model') . ucfirst($property['name'] ?? 'Value')));
-
-            return $wrapNullable(($property['type'] ?? '') === self::TYPE_ARRAY
-                ? 'List[' . $enumType . ']'
-                : $enumType);
-        }
-
-        if (($property['type'] ?? '') === self::TYPE_OBJECT) {
-            return $wrapNullable('Dict[str, Any]');
-        }
-
-        return $this->getTypeName(array_merge($property, [
-            'required' => true,
-            'nullable' => $property['nullable'] ?? false,
-        ]));
-    }
-
-    protected function getServiceModelTypeName(string $modelName, string $serviceName): string
-    {
-        $modelType = $this->getModelName($modelName);
-
-        if ($modelType === $this->getModelName($serviceName)) {
-            return $modelType . 'Model';
-        }
-
-        return $modelType;
-    }
-
-    protected function getServicePropertyType(array $parameter, string $serviceName): string
-    {
-        if (!empty($parameter['array']['model'])) {
-            $typeName = 'List[' . $this->getServiceModelTypeName($parameter['array']['model'], $serviceName) . ']';
-        } elseif (!empty($parameter['model'])) {
-            $modelType = $this->getServiceModelTypeName($parameter['model'], $serviceName);
-            $typeName = ($parameter['type'] ?? '') === self::TYPE_ARRAY ? 'List[' . $modelType . ']' : $modelType;
-        } else {
-            return $this->getTypeName($parameter);
-        }
-
-        if (!($parameter['required'] ?? true) || ($parameter['nullable'] ?? false)) {
-            return 'Optional[' . $typeName . ']';
-        }
-
-        return $typeName;
-    }
-
-    protected function getResponseType(array $method, string $serviceName = ''): string
-    {
-        if (($method['type'] ?? null) === 'webAuth') {
-            return 'str';
-        }
-
-        if (($method['type'] ?? null) === 'location') {
-            return 'bytes';
-        }
-
-        if (!empty($method['responseModels']) && count($method['responseModels']) > 1) {
-            $types = array_map(fn(string $model): string => $this->getDocsModelTypeName($model, $serviceName), array_filter(
-                $method['responseModels'],
-                fn($model): bool => !empty($model) && $model !== 'any'
-            ));
-
-            return $this->getUnionType($types);
-        }
-
-        if (!empty($method['responseModel']) && $method['responseModel'] !== 'any') {
-            return $this->getDocsModelTypeName($method['responseModel'], $serviceName);
-        }
-
-        return 'Dict[str, Any]';
-    }
-
-    /**
-     * Check if a model or any of its sub-schemas has additionalProperties
-     */
-    protected function hasGenericType(?string $model, array $spec): bool
-    {
-        if (empty($model) || $model === 'any' || !array_key_exists($model, $spec['definitions'] ?? [])) {
-            return false;
-        }
-
-        $modelDef = $spec['definitions'][$model];
-
-        // Check if model has additionalProperties (dynamic fields)
-        if (!empty($modelDef['additionalProperties'])) {
-            return true;
-        }
-
-        // Recursively check sub-schemas
-        foreach ($modelDef['properties'] ?? [] as $property) {
-            if (!\array_key_exists('sub_schema', $property) || !$property['sub_schema']) {
-                continue;
-            }
-            if ($this->hasGenericType($property['sub_schema'], $spec)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Creates an example for a response model with the given name
-     *
-     * @param string $model
-     * @return string
-     */
-    protected function getResponseModelExample(?string $model, array $spec): mixed
-    {
-        if (!$model) {
-            return (object) [];
-        }
-
-        $modelDef = $spec['definitions'][$model];
-
+        $visited[$modelName] = true;
         $result = [];
-        foreach ($modelDef['properties'] ?? [] as $property) {
-            if (!$property['required']) {
+        foreach ($model->required as $propertyName) {
+            $property = $model->properties[$propertyName] ?? null;
+            if (!$property instanceof Schema) {
                 continue;
             }
 
-            $result[$property['name']] = match ($property['type']) {
-                'object' => (array_key_exists('sub_schema', $property) && $property['sub_schema']) ? ((object) $this->getResponseModelExample($property['sub_schema'], $spec)) : new stdClass(),
-                'array' => [],
-                'string' => $property['example'] ?? '',
-                'boolean' => true,
-                'float' => (float) $property['example'],
-                'integer' => (float) $property['example'],
-                default => $property['example'] ?? null,
+            $example = $this->getSchemaExample($property);
+            $hasExample = $example !== null && $example !== '';
+            $enumValues = $this->getEnumSchema($property)->enum;
+            $result[$propertyName] = match ($this->getSchemaType($property)) {
+                self::TYPE_OBJECT => ($models = $this->getSchemaModels($property)) !== []
+                ? $this->getResponseModelExample($models[0], $spec, $visited)
+                : new stdClass(),
+                self::TYPE_ARRAY => [],
+                self::TYPE_STRING => $hasExample ? $example : ($enumValues[0] ?? ''),
+                    // The fixture asserts the field is present and decodes as a
+                    // bool; it does not mirror the spec's example value.
+                self::TYPE_BOOLEAN => true,
+                self::TYPE_NUMBER => $hasExample ? $example : 0,
+                    // Python annotates both integer and number as float, and the
+                    // fixtures follow the annotation rather than the spec type.
+                self::TYPE_INTEGER => (float) ($hasExample ? $example : 0),
+                default => $example,
             };
         }
 
         return (object) $result;
+    }
+
+    /** @param array<string, true> $visited @return list<string> */
+    protected function getAdditionalPropertiesExpectationLines(?string $modelName, Specification $spec, string $target, array $visited = []): array
+    {
+        if ($modelName === null || isset($visited[$modelName])) {
+            return [];
+        }
+
+        $model = $spec->schemas[$modelName] ?? null;
+        if (!$model instanceof ObjectSchema) {
+            return [];
+        }
+
+        $visited[$modelName] = true;
+        $lines = [];
+        if ($model->additionalProperties && $model->properties !== []) {
+            $lines[] = $target . "['data'] = {}";
+        }
+
+        foreach ($model->required as $propertyName) {
+            $property = $model->properties[$propertyName] ?? null;
+            if (!$property instanceof Schema || $property instanceof ArraySchema) {
+                continue;
+            }
+            $nestedModel = $this->getSchemaModel($property);
+            if ($nestedModel === null) {
+                continue;
+            }
+            $escapedName = \str_replace(["\\", "'"], ["\\\\", "\\'"], $propertyName);
+            $lines = [
+                ...$lines,
+                ...$this->getAdditionalPropertiesExpectationLines(
+                    $nestedModel,
+                    $spec,
+                    $target . "['" . $escapedName . "']",
+                    $visited,
+                ),
+            ];
+        }
+
+        return $lines;
+    }
+
+    protected function getAdditionalPropertiesExpectations(?string $modelName, Specification $spec, string $target): string
+    {
+        return \implode("\n", \array_map(
+            static fn(string $line): string => '        ' . $line,
+            $this->getAdditionalPropertiesExpectationLines($modelName, $spec, $target),
+        ));
+    }
+
+    protected function toPythonValue(mixed $value, int $indent = 8): string
+    {
+        $isObject = \is_object($value);
+        if ($isObject) {
+            $value = \get_object_vars($value);
+        }
+
+        if (\is_array($value)) {
+            if ($value === []) {
+                return $isObject ? '{}' : '[]';
+            }
+
+            $isList = !$isObject && \array_is_list($value);
+            $opening = $isList ? '[' : '{';
+            $closing = $isList ? ']' : '}';
+            $lines = [$opening];
+
+            foreach ($value as $key => $item) {
+                $prefix = $isList ? '' : $this->toPythonValue((string) $key, $indent + 4) . ': ';
+                $formatted = $this->toPythonValue($item, $indent + 4);
+                $lines[] = \str_repeat(' ', $indent + 4) . $prefix . $formatted . ',';
+            }
+
+            $lines[] = \str_repeat(' ', $indent) . $closing;
+
+            return \implode("\n", $lines);
+        }
+
+        if ($value === null) {
+            return 'None';
+        }
+        if (\is_bool($value)) {
+            return $value ? 'True' : 'False';
+        }
+
+        $json = json_encode($value, JSON_PRESERVE_ZERO_FRACTION);
+
+        return \is_string($json) ? $json : 'None';
+    }
+
+    /**
+     * Maps every character of a line to whether it sits inside a Python string
+     * literal, so a parenthesis written in an alias such as 'name(legacy)' is not
+     * read as call syntax while matching delimiters.
+     *
+     * @return array<bool>
+     */
+    protected function quotedPositions(string $line): array
+    {
+        $quoted = [];
+        $quote = null;
+
+        for ($position = 0, $length = \strlen($line); $position < $length; $position++) {
+            $character = $line[$position];
+
+            if ($quote !== null) {
+                $quoted[$position] = true;
+                if ($character === $quote && $line[$position - 1] !== '\\') {
+                    $quote = null;
+                }
+                continue;
+            }
+
+            if ($character === "'" || $character === '"') {
+                $quote = $character;
+                $quoted[$position] = true;
+                continue;
+            }
+
+            $quoted[$position] = false;
+        }
+
+        return $quoted;
+    }
+
+    /**
+     * Collapses a call rendered on one line, or explodes its arguments with a magic
+     * trailing comma when the line is longer than Black's configured line length.
+     * Black keeps a call that fits on one line as it is, so emitting the exploded
+     * form unconditionally leaves generated code broken across lines for no reason.
+     * The line length is set in `templates/python/pyproject.toml.twig`.
+     */
+    protected function formatCall(string $statement): string
+    {
+        $lines = \explode("\n", $statement);
+        $line = \array_pop($lines);
+
+        if ($line === null || \strlen(\rtrim($line)) <= self::LINE_LENGTH) {
+            return $statement;
+        }
+
+        $line = \rtrim($line);
+        if (!\str_ends_with($line, ')')) {
+            return $statement;
+        }
+
+        $quoted = $this->quotedPositions($line);
+        if ($quoted[\strlen($line) - 1]) {
+            return $statement;
+        }
+
+        $depth = 0;
+        $open = null;
+        for ($position = \strlen($line) - 1; $position >= 0; $position--) {
+            if ($quoted[$position]) {
+                continue;
+            }
+
+            $character = $line[$position];
+            if ($character === ')') {
+                $depth++;
+            } elseif ($character === '(') {
+                $depth--;
+                if ($depth === 0) {
+                    $open = $position;
+                    break;
+                }
+            }
+        }
+
+        if ($open === null) {
+            return $statement;
+        }
+
+        $indent = \strlen($line) - \strlen(\ltrim($line));
+        $arguments = \substr($line, $open + 1, -1);
+        if (\trim($arguments) === '') {
+            return $statement;
+        }
+
+        $exploded = [\substr($line, 0, $open + 1)];
+        foreach ($this->splitArguments($arguments) as $argument) {
+            $exploded[] = \str_repeat(' ', $indent + 4) . $argument . ',';
+        }
+        $exploded[] = \str_repeat(' ', $indent) . ')';
+
+        $lines[] = \implode("\n", $exploded);
+
+        return \implode("\n", $lines);
+    }
+
+    /**
+     * @return array<string>
+     */
+    protected function splitArguments(string $arguments): array
+    {
+        $split = [];
+        $argument = '';
+        $depth = 0;
+        $quoted = $this->quotedPositions($arguments);
+
+        for ($position = 0, $length = \strlen($arguments); $position < $length; $position++) {
+            $character = $arguments[$position];
+
+            if ($quoted[$position]) {
+                $argument .= $character;
+                continue;
+            }
+
+            if ($character === ',' && $depth === 0) {
+                $split[] = \trim($argument);
+                $argument = '';
+                continue;
+            }
+
+            if (\in_array($character, ['(', '[', '{'], true)) {
+                $depth++;
+            } elseif (\in_array($character, [')', ']', '}'], true)) {
+                $depth--;
+            }
+
+            $argument .= $character;
+        }
+
+        if (\trim($argument) !== '') {
+            $split[] = \trim($argument);
+        }
+
+        return $split;
+    }
+
+    protected function formatDocstring(string $description, int $indent): string
+    {
+        $lines = \explode("\n", \str_replace("\r\n", "\n", \trim($description)));
+        foreach ($lines as $index => $line) {
+            $line = \rtrim($line);
+            if ($index > 0 && $line !== '') {
+                $line = \str_repeat(' ', $indent) . $line;
+            }
+            $lines[$index] = $line;
+        }
+
+        return \implode("\n", $lines);
+    }
+
+    protected function formatModelFieldType(string $type): string
+    {
+        if (!\str_contains($type, 'Union[')) {
+            return $type;
+        }
+
+        $unionPosition = \strpos($type, 'Union[');
+        if ($unionPosition === false) {
+            return $type;
+        }
+
+        $prefix = \substr($type, 0, $unionPosition);
+        $innerStart = $unionPosition + \strlen('Union[');
+        $depth = 1;
+        $unionEnd = null;
+        for ($position = $innerStart, $length = \strlen($type); $position < $length; $position++) {
+            if ($type[$position] === '[') {
+                $depth++;
+            } elseif ($type[$position] === ']') {
+                $depth--;
+                if ($depth === 0) {
+                    $unionEnd = $position;
+                    break;
+                }
+            }
+        }
+
+        if ($unionEnd === null) {
+            return $type;
+        }
+
+        $outerDepth = \substr_count($prefix, '[') - \substr_count($prefix, ']');
+        $suffix = \substr($type, $unionEnd + 1);
+        if ($suffix !== \str_repeat(']', $outerDepth)) {
+            return $type;
+        }
+
+        $members = [];
+        $member = '';
+        $memberDepth = 0;
+        $union = \substr($type, $innerStart, $unionEnd - $innerStart);
+        for ($position = 0, $length = \strlen($union); $position < $length; $position++) {
+            $character = $union[$position];
+            if ($character === ',' && $memberDepth === 0) {
+                $members[] = \trim($member);
+                $member = '';
+                continue;
+            }
+
+            $member .= $character;
+            if ($character === '[') {
+                $memberDepth++;
+            } elseif ($character === ']') {
+                $memberDepth--;
+            }
+        }
+        if (\trim($member) !== '') {
+            $members[] = \trim($member);
+        }
+
+        $lines = [$prefix . ($prefix === '' ? '' : "\n" . \str_repeat(' ', 4 + ($outerDepth * 4))) . 'Union['];
+        foreach ($members as $member) {
+            $lines[] = \str_repeat(' ', 8 + ($outerDepth * 4)) . $member . ',';
+        }
+        $lines[] = \str_repeat(' ', 4 + ($outerDepth * 4)) . ']';
+
+        for ($remaining = $outerDepth; $remaining > 0; $remaining--) {
+            $lines[] = \str_repeat(' ', 4 + (($remaining - 1) * 4)) . ']';
+        }
+
+        return \implode("\n", $lines);
     }
 
     #[Override]
@@ -759,29 +978,36 @@ class Python extends Language
     {
         return [
             new TwigFilter('caseEnumKey', fn(string $value): string => $this->toUpperSnakeCase($value)),
-            new TwigFilter('getPropertyType', fn(array $value, array $method = []): string => $this->getTypeName($value, $method)),
-            new TwigFilter('hasGenericType', fn(string $model, array $spec): bool => $this->hasGenericType($model, $spec)),
-            new TwigFilter('hasGenericTypeProperty', fn(array $properties, array $spec): bool => array_any($properties, fn($property): bool => !empty($property['sub_schema']) && $this->hasGenericType($property['sub_schema'], $spec))),
-            new TwigFilter('getServicePropertyType', fn(array $value, string $serviceName): string => $this->getServicePropertyType($value, $serviceName)),
-            new TwigFilter('getModelPropertyType', fn(array $value, string $ownerName = ''): string => $this->getModelPropertyType($value, $ownerName)),
-            new TwigFilter('getModelFieldName', fn(array $value, array $properties): string => $this->getModelFieldName($value, $properties)),
-            new TwigFilter('getResponseType', fn(array $method, string $serviceName = ''): string => $this->getResponseType($method, $serviceName)),
+            new TwigFilter('getPropertyType', fn(Schema|Parameter $value): string => $this->getTypeName($value)),
+            new TwigFilter('hasGenericType', fn(string $model, Specification $spec): bool => $this->hasGenericType($model, $spec)),
+            new TwigFilter('hasGenericTypeProperty', fn(array $properties, Specification $spec): bool => $this->hasGenericTypeProperty($properties, $spec)),
+            new TwigFilter('getServicePropertyType', fn(Schema|Parameter $value, Tag $service, Specification $spec): string => $this->getServicePropertyType($value, $spec)),
+            new TwigFilter('getServiceEnumName', fn(Parameter $parameter, Tag $service, Specification $spec): string => $this->getServiceEnumName($parameter, $spec)),
+            new TwigFilter('getModelPropertyType', fn(Schema $value, string $ownerName, Specification $spec): string => $this->getModelPropertyType($value, $spec)),
+            new TwigFilter('formatDocstring', fn(string $description, int $indent): string => $this->formatDocstring($description, $indent)),
+            new TwigFilter('formatModelFieldType', fn(string $type): string => $this->formatModelFieldType($type)),
+            new TwigFilter('formatCall', fn(string $statement): string => $this->formatCall($statement)),
+            new TwigFilter('modelPropertyNullable', fn(Schema $value): bool => !($value instanceof ArraySchema) && $value->nullable),
+            new TwigFilter('getModelFieldName', fn(Schema $value, array $properties): string => $this->getModelFieldName($value, $properties)),
+            new TwigFilter('getResponseType', fn(Operation $method, string $serviceName = ''): string => $this->getResponseType($method, $serviceName)),
             new TwigFilter('formatParamValue', function (string $paramName, string $paramType, bool $isMultipartFormData): string {
                 if ($isMultipartFormData && $paramType === self::TYPE_BOOLEAN) {
                     return "str({$paramName}).lower() if type({$paramName}) is bool else {$paramName}";
                 }
                 return $paramName;
             }),
-            new TwigFilter('enumExample', function (array $param): string {
-                $enumValues = $param['enumValues'] ?? [];
-                if (empty($enumValues)) {
+            new TwigFilter('enumExample', function (Schema|Parameter $param): string {
+                $schema = $this->getSchema($param);
+                $enumSchema = $this->getEnumSchema($param);
+                $enumValues = $enumSchema->enum;
+                if ($enumValues === []) {
                     return '';
                 }
 
-                $enumKeys = $param['enumKeys'] ?? [];
-                $enumName = $this->toPascalCase($param['enumName'] ?? $param['name'] ?? '');
-                $example = $param['example'] ?? null;
-                $isArray = ($param['type'] ?? '') === self::TYPE_ARRAY;
+                $enumKeys = $this->resolveEnumKeys($param);
+                $enumName = $this->toPascalCase(($enumSchema instanceof StringSchema ? $enumSchema->enumName : null) ?? ($param instanceof Parameter ? $param->name : $enumSchema->title ?? ''));
+                $example = $this->getSchemaExample($param);
+                $isArray = $schema instanceof ArraySchema;
 
                 $resolveKey = function ($value) use ($enumValues, $enumKeys): string {
                     $index = array_search($value, $enumValues, true);
@@ -818,13 +1044,9 @@ class Python extends Language
                 $value = ($example !== null && $example !== '') ? $example : $enumValues[0];
                 return $enumName . '.' . $resolveKey($value);
             }),
-            new TwigFilter('requestModelExample', fn(array $parameter, array $spec, string $serviceName = ''): string => $this->getRequestModelExample($parameter, $spec, $serviceName)),
-            new TwigFilter('responseModelExample', function (string $model, array $spec): string {
-                $result = $this->getResponseModelExample($model, $spec);
-                $json = json_encode($result, JSON_PRETTY_PRINT | JSON_PRESERVE_ZERO_FRACTION);
-
-                return str_replace(['true', 'false', 'null'], ["True", "False", "None"], $json);
-            })
+            new TwigFilter('requestModelExample', fn(Parameter $parameter, Specification $spec, string $serviceName = ''): string => $this->getRequestModelExample($parameter, $spec, $serviceName)),
+            new TwigFilter('responseModelExample', fn(string $model, Specification $spec): string => $this->toPythonValue($this->getResponseModelExample($model, $spec))),
+            new TwigFilter('additionalPropertiesExpectations', fn(string $model, Specification $spec, string $target): string => $this->getAdditionalPropertiesExpectations($model, $spec, $target))
         ];
     }
 }

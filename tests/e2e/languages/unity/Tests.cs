@@ -104,6 +104,13 @@ namespace AppwriteTests
                 }
             });
 
+            var realtimeErrorResponse = "Realtime error:failed";
+            realtime.OnError += (error) =>
+            {
+                realtimeErrorResponse = "Realtime error:passed";
+            };
+            realtime.Subscribe(new[] { "error" }, (eventData) => { });
+
             await Task.Delay(5000);
 
             // Ping test
@@ -150,6 +157,20 @@ namespace AppwriteTests
             // General Tests
             var result = await general.Redirect();
             LogResult((result as Dictionary<string, object>)["result"]);
+
+            foreach (var ids in new[] { new[] { "", "0" }, new[] { "0", "" } })
+            {
+                try
+                {
+                    await general.ValidatePath(ids[1], ids[0]);
+                    throw new System.Exception("Empty path parameter was accepted");
+                }
+                catch (AppwriteException e)
+                {
+                    LogResult(e.Message);
+                }
+            }
+            LogResult((await general.ValidatePath("0", "0")).Result);
 
             mock = await general.Upload("string", 123, new List<string>() { "string in array" }, InputFile.FromPath("../../../resources/file.png"));
             LogResult(mock.Result);
@@ -232,6 +253,7 @@ namespace AppwriteTests
             LogResult(realtimeResponse);
             LogResult(realtimeResponseWithQueries);
             LogResult(realtimeResponseWithQueriesFailure);
+            LogResult(realtimeErrorResponse);
 
             try
             {
@@ -336,6 +358,9 @@ namespace AppwriteTests
             LogResult(Query.DistanceGreaterThan("location", new List<object> { 40.7128, -74 }, 1000, true));
             LogResult(Query.DistanceLessThan("location", new List<object> { 40.7128, -74 }, 1000));
             LogResult(Query.DistanceLessThan("location", new List<object> { 40.7128, -74 }, 1000, true));
+            LogResult(Query.VectorDot("embedding", new List<double> { 0.1, 0.2, 0.3 }));
+            LogResult(Query.VectorCosine("embedding", new List<double> { 0.1, 0.2, 0.3 }));
+            LogResult(Query.VectorEuclidean("embedding", new List<double> { 0.1, 0.2, 0.3 }));
             
             // Spatial query tests
             LogResult(Query.Intersects("location", new List<object> { 40.7128, -74 }));

@@ -2,6 +2,7 @@
 .dart_tool
 /vendor/
 /tests/e2e/sdks
+/tests/generation/sdks
 /.vscode
 .vs
 .phpunit.*
@@ -28,5 +29,6 @@ templates/swift/example/Example.xcodeproj/xcuserdata
 go.sum
 
 # exclude raw lock files in templates (use .twig versions instead)
-templates/cli/package-lock.json
-templates/cli/bun.lock
+
+# Written by the CLI conformance harness when it runs in place.
+tests/e2e/languages/cli/appwrite.config.json

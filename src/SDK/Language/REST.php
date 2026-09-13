@@ -2,6 +2,10 @@
 
 namespace Appwrite\SDK\Language;
 
+use Utopia\OpenAPI\Model\Parameter;
+use Utopia\OpenAPI\Model\Schema;
+use Utopia\OpenAPI\Specification;
+
 class REST extends HTTP
 {
     public function getName(): string
@@ -24,11 +28,11 @@ class REST extends HTTP
         return '[' . $elements . ']';
     }
 
-    public function getParamDefault(array $param): string
+    public function getParamDefault(Schema|Parameter $param): string
     {
-        $type = $param['type'] ?? '';
-        $default = $param['default'] ?? '';
-        $required = $param['required'] ?? '';
+        $type = $this->getSchemaType($param);
+        $default = $this->getSchemaDefault($param);
+        $required = ($param instanceof Parameter && $param->required);
 
         if ($required) {
             return '';
@@ -75,10 +79,10 @@ class REST extends HTTP
         return $output;
     }
 
-    public function getParamExample(array $param, string $lang = '', array $spec = []): string
+    public function getParamExample(Schema|Parameter $param, string $lang = '', array $spec = []): string
     {
-        $type = $param['type'] ?? '';
-        $example = $param['example'] ?? '';
+        $type = $this->getSchemaType($param);
+        $example = $this->getSchemaExample($param);
 
         $hasExample = !empty($example) || $example === 0 || $example === false;
 
@@ -94,30 +98,19 @@ class REST extends HTTP
         }
 
         return match ($type) {
-            self::TYPE_ARRAY => (function () use ($example) {
-                    // If array of strings, make sure any sub-strings are escaped
-                if (\substr((string) $example, 1, 1) === '"') {
-                    $start = \substr((string) $example, 0, 2);
-                    $end = \substr((string) $example, -2);
-                    $contents = \substr((string) $example, 2, -2);
-                    $contents = \addslashes($contents);
-                    return $start . $contents . $end;
-                } else {
-                    return $example;
-                }
-            })(),
+            self::TYPE_ARRAY => $example,
             self::TYPE_FILE, self::TYPE_INTEGER, self::TYPE_NUMBER => $example,
             self::TYPE_BOOLEAN => ($example) ? 'true' : 'false',
             self::TYPE_OBJECT => ($example === '{}')
             ? '{}'
             : (($formatted = json_encode(json_decode((string) $example, true), JSON_PRETTY_PRINT))
-                ? (function () use ($formatted): string|array|null {
+                ? (function () use ($formatted): string|array|null{
                         // Replace leading four spaces with two spaces for indentation
                         $formatted = preg_replace('/^    /m', '  ', $formatted);
                         // Add two spaces before the closing brace if it's on a new line at the end
                         $formatted = preg_replace('/\n(?=[^}]*}$)/', "\n  ", (string) $formatted);
                         return $formatted;
-                })()
+                    })()
                 : $example),
             self::TYPE_STRING => "\"{$example}\"",
         };
@@ -128,7 +121,7 @@ class REST extends HTTP
         return [
             [
                 'scope' => 'method',
-                'destination' => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
+                'destination' => 'docs/examples/{{service.name | caseLower}}/{{(method | methodName) | caseKebab}}.md',
                 'template' => '/rest/docs/example.md.twig',
             ],
         ];

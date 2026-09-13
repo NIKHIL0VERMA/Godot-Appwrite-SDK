@@ -20,6 +20,7 @@ func main() {
 
 	client := appwrite.NewClient(
 		appwrite.WithTimeout(60 * time.Second),
+		appwrite.WithProject("console"),
 	)
 	client.AddHeader("Origin", "http://localhost")
 	sdkHeaders := client.GetHeaders()
@@ -112,6 +113,27 @@ func testGeneralService(client client.Client, stringInArray []string) {
 		fmt.Printf("general.Redirect => error %v", err)
 	}
 	fmt.Printf("%s\n", (*response).(map[string]interface{})["result"].(string))
+
+	for _, ids := range [][2]string{{"", "0"}, {"0", ""}} {
+		if _, err := general.ValidatePath(ids[1], ids[0]); err != nil {
+			fmt.Println(err)
+		} else {
+			panic("Empty path parameter was accepted")
+		}
+	}
+	validated, err := general.ValidatePath("0", "0")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(validated.Result)
+
+	// The mock route is registered at the ENCODED path, so this only reaches it
+	// if the id is escaped on the way into the URL.
+	pathResponse, err := general.GetPath("grant/special&id")
+	if err != nil {
+		fmt.Printf("general.GetPath => error %v", err)
+	}
+	fmt.Printf("%s\n", pathResponse.Result)
 
 	testGeneralUpload(client, stringInArray)
 	testGeneralUpload(client, stringInArray)
@@ -246,6 +268,9 @@ func testQueries() {
 	fmt.Println(query.DistanceGreaterThan("location", []interface{}{40.7128, -74}, 1000, true))
 	fmt.Println(query.DistanceLessThan("location", []interface{}{40.7128, -74}, 1000, true))
 	fmt.Println(query.DistanceLessThan("location", []interface{}{40.7128, -74}, 1000, true))
+	fmt.Println(query.VectorDot("embedding", []float64{0.1, 0.2, 0.3}))
+	fmt.Println(query.VectorCosine("embedding", []float64{0.1, 0.2, 0.3}))
+	fmt.Println(query.VectorEuclidean("embedding", []float64{0.1, 0.2, 0.3}))
 
 	// Spatial query tests
 	fmt.Println(query.Intersects("location", []interface{}{40.7128, -74}))

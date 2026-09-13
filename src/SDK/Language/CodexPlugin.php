@@ -6,7 +6,7 @@ namespace Appwrite\SDK\Language;
 
 use Override;
 
-class CodexPlugin extends AgentSkills
+class CodexPlugin extends Skills
 {
     #[Override]
     public function getName(): string
@@ -36,14 +36,14 @@ class CodexPlugin extends AgentSkills
         foreach ($languages as $lang) {
             $files[] = [
                 'scope'       => 'default',
-                'destination' => 'plugins/{{ spec.title | caseLower }}/skills/{{ spec.title | caseLower }}-' . $lang . '/SKILL.md',
-                'template'    => 'agent-skills/' . $lang . '.md.twig',
+                'destination' => 'plugins/{{ spec.info.title | caseLower }}/skills/{{ spec.info.title | caseLower }}-' . $lang . '/SKILL.md',
+                'template'    => 'skills/' . $lang . '.md.twig',
             ];
         }
 
         $files[] = [
             'scope'       => 'default',
-            'destination' => 'plugins/{{ spec.title | caseLower }}/.codex-plugin/plugin.json',
+            'destination' => 'plugins/{{ spec.info.title | caseLower }}/.codex-plugin/plugin.json',
             'template'    => 'codex-plugin/plugin.json.twig',
         ];
 
@@ -55,25 +55,25 @@ class CodexPlugin extends AgentSkills
 
         $files[] = [
             'scope'       => 'default',
-            'destination' => 'plugins/{{ spec.title | caseLower }}/.mcp.json',
+            'destination' => 'plugins/{{ spec.info.title | caseLower }}/.mcp.json',
             'template'    => 'codex-plugin/.mcp.json.twig',
         ];
 
         $files[] = [
             'scope'       => 'default',
-            'destination' => 'plugins/{{ spec.title | caseLower }}/skills/{{ spec.title | caseLower }}-deploy-site/SKILL.md',
+            'destination' => 'plugins/{{ spec.info.title | caseLower }}/skills/{{ spec.info.title | caseLower }}-deploy-site/SKILL.md',
             'template'    => 'plugin/commands/deploy-site.md.twig',
         ];
 
         $files[] = [
             'scope'       => 'default',
-            'destination' => 'plugins/{{ spec.title | caseLower }}/skills/{{ spec.title | caseLower }}-deploy-function/SKILL.md',
+            'destination' => 'plugins/{{ spec.info.title | caseLower }}/skills/{{ spec.info.title | caseLower }}-deploy-function/SKILL.md',
             'template'    => 'plugin/commands/deploy-function.md.twig',
         ];
 
         $files[] = [
             'scope'       => 'default',
-            'destination' => 'plugins/{{ spec.title | caseLower }}/config.toml',
+            'destination' => 'plugins/{{ spec.info.title | caseLower }}/config.toml',
             'template'    => 'codex-plugin/config.toml.twig',
         ];
 
@@ -86,7 +86,7 @@ class CodexPlugin extends AgentSkills
         $files[] = [
             'scope'       => 'default',
             'destination' => 'CHANGELOG.md',
-            'template'    => 'agent-skills/CHANGELOG.md.twig',
+            'template'    => 'skills/CHANGELOG.md.twig',
         ];
 
         $files[] = [

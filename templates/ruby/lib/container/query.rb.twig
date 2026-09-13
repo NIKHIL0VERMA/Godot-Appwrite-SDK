@@ -1,6 +1,6 @@
 require 'json'
 
-module {{spec.title | caseUcfirst}}
+module {{spec.info.title | caseUcfirst}}
     class Query
         def initialize(method, attribute = nil, values = nil)
             @method = method
@@ -48,15 +48,15 @@ module {{spec.title | caseUcfirst}}
             def less_than(attribute, value)
                 return Query.new("lessThan", attribute, value).to_s
             end
-            
+
             def less_than_equal(attribute, value)
                 return Query.new("lessThanEqual", attribute, value).to_s
             end
-            
+
             def greater_than(attribute, value)
                 return Query.new("greaterThan", attribute, value).to_s
             end
-            
+
             def greater_than_equal(attribute, value)
                 return Query.new("greaterThanEqual", attribute, value).to_s
             end
@@ -100,7 +100,7 @@ module {{spec.title | caseUcfirst}}
             def select(attributes)
                 return Query.new("select", nil, attributes).to_s
             end
-            
+
             def search(attribute, value)
                 return Query.new("search", attribute, value).to_s
             end
@@ -230,6 +230,18 @@ module {{spec.title | caseUcfirst}}
 
             def distance_less_than(attribute, values, distance, meters = true)
                 return Query.new("distanceLessThan", attribute, [[values, distance, meters]]).to_s
+            end
+
+            def vector_dot(attribute, vector)
+                return Query.new("vectorDot", attribute, [vector]).to_s
+            end
+
+            def vector_cosine(attribute, vector)
+                return Query.new("vectorCosine", attribute, [vector]).to_s
+            end
+
+            def vector_euclidean(attribute, vector)
+                return Query.new("vectorEuclidean", attribute, [vector]).to_s
             end
 
             def intersects(attribute, values)

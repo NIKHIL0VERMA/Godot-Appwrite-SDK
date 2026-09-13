@@ -52,6 +52,7 @@ Primary goals:
 - Publish ready-to-use SDK releases
 - Support Godot Asset Library distribution
 - Track Appwrite API updates
+[Utopia OpenAPI](https://github.com/utopia-php/openapi) parses OpenAPI 2.0, 3.0, and 3.1 documents into one canonical model. The generator consumes that model to render services, methods, models, enums, and union types.
 
 ## Getting Started
 
@@ -81,18 +82,16 @@ Create language and SDK instances and generate code to target directory.
 
 require_once 'vendor/autoload.php';
 
-use Appwrite\Spec\OpenAPI3;
 use Appwrite\SDK\SDK;
 use Appwrite\SDK\Language\PHP;
+use Utopia\OpenAPI\Parser;
 
-// Read API specification file (OpenAPI 3) and create spec instance
-$version = '1.9.x';
+// Parse an OpenAPI 2, 3.0, or 3.1 document into the canonical specification model.
+// One document covers every SDK platform; the SDK selects its own below.
+$version = '2.0.x';
 $platform = 'server';
-$spec = new OpenAPI3(file_get_contents("https://raw.githubusercontent.com/appwrite/specs/main/specs/{$version}/open-api3-{$version}-{$platform}.json"));
-
-// Swagger 2 specs are supported as well:
-// use Appwrite\Spec\Swagger2;
-// $spec = new Swagger2(file_get_contents("https://raw.githubusercontent.com/appwrite/specs/main/specs/{$version}/swagger2-{$version}-{$platform}.json"));
+$content = file_get_contents("https://raw.githubusercontent.com/appwrite/specs/main/specs/{$version}/open-api3-{$version}.json");
+$spec = Parser::parse($content);
 
 // Create language instance
 $lang = new PHP();
@@ -106,6 +105,7 @@ $lang // Set language or platform specific options
 $sdk  = new SDK($lang, $spec);
 
 $sdk
+    ->setPlatform($platform) // Keep the operations, aliases and security schemes available to this platform
     ->setCoverImage('https://github.com/appwrite/appwrite/raw/main/public/images/github.png')
     ->setLicenseContent('License content here.')
     ->setVersion('v1.1.0')
@@ -115,33 +115,39 @@ $sdk->generate(__DIR__ . '/examples/php'); // Generate source code
 
 ```
 
-For generated artifacts that do not need an API specification, use `StaticSpec`:
+For generated artifacts that do not need API operations, create a minimal canonical specification:
 
 ```php
 <?php
 
 require_once 'vendor/autoload.php';
 
-use Appwrite\Spec\StaticSpec;
 use Appwrite\SDK\SDK;
-use Appwrite\SDK\Language\AgentSkills;
+use Appwrite\SDK\Language\Skills;
+use Utopia\OpenAPI\Parser;
 
-$spec = new StaticSpec(
-    title: 'Appwrite',
-    description: 'Appwrite backend as a service',
-    version: '1.9.x',
-    licenseName: 'BSD-3-Clause',
-    licenseURL: 'https://raw.githubusercontent.com/appwrite/appwrite/master/LICENSE',
-);
+$spec = Parser::parse([
+    'openapi' => '3.0.0',
+    'info' => [
+        'title' => 'Appwrite',
+        'description' => 'Appwrite backend as a service',
+        'version' => '2.0.x',
+        'license' => [
+            'name' => 'BSD-3-Clause',
+            'url' => 'https://raw.githubusercontent.com/appwrite/appwrite/master/LICENSE',
+        ],
+    ],
+    'paths' => [],
+]);
 
-$sdk = new SDK(new AgentSkills(), $spec);
+$sdk = new SDK(new Skills(), $spec);
 
 $sdk
     ->setName('Appwrite')
-    ->setVersion('1.9.x')
+    ->setVersion('2.0.x')
 ;
 
-$sdk->generate(__DIR__ . '/examples/agent-skills');
+$sdk->generate(__DIR__ . '/examples/skills');
 ```
 
 ## Linting Twig Templates
@@ -159,13 +165,30 @@ Requires [uv](https://github.com/astral-sh/uv) to be installed. Configuration is
 
 ## Supported Specs
 
-* [OpenAPI 3](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md)
-* [Swagger 2](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md)
+* [OpenAPI 3.1](https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.0.md)
+* [OpenAPI 3.0](https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.4.md)
+* [OpenAPI (Swagger) 2](https://github.com/OAI/OpenAPI-Specification/blob/main/versions/2.0.md)
 * [RAML 1.0](https://raml.org/) (Not Ready)
 * [RAML 0.8](https://raml.org/) (Not Ready)
 * [Postman 2.0](https://schema.getpostman.com/json/collection/v2.0.0/docs/index.html) (Not Ready)
 * [Postman 1.0](https://schema.getpostman.com/json/collection/v1.0.0/docs/index.html) (Not Ready)
 * [API Blueprint 1A](https://github.com/apiaryio/api-blueprint/blob/master/API%20Blueprint%20Specification.md) (Not Ready)
+
+### Naming enum values
+
+Enum wire values are converted into identifiers for each generated language. To give values explicit semantic names, describe the enum as titled `oneOf` branches. This is especially useful when values contain non-Latin text:
+
+```yaml
+title: ProvinceType
+type: string
+oneOf:
+  - title: Capital
+    enum: [រាជធានី]
+  - title: Province
+    enum: [ខេត្ត]
+```
+
+OpenAPI 3.1 specifications can use `const` instead of a single-value `enum`. When a value has no explicit title and cannot form a valid identifier, the generator uses a deterministic positional name such as `Value1`.
 
 ## Generated SDKs and Artifacts
 
@@ -180,7 +203,7 @@ php example.php <target> <platform> <format>
 
 `<platform>` can be `console`, `client`, or `server`. If omitted, it defaults to `console`.
 
-`<format>` can be `openapi3` or `swagger2`. If omitted, it defaults to `openapi3`. Both formats produce identical SDKs.
+`<format>` can be `openapi3` or `swagger2`. If omitted, it defaults to `openapi3`. Remote OpenAPI 3 generation uses the current `2.0.x` specs; because Swagger 2 documents are not published for `2.0.x`, remote Swagger 2 generation uses the latest available `1.8.x` specs.
 
 Examples:
 
@@ -188,7 +211,8 @@ Examples:
 php example.php web client
 php example.php node server
 php example.php cli console
-php example.php agent-skills
+php example.php skills
+php example.php zed-extension
 ```
 
 ### Client SDKs
@@ -196,9 +220,9 @@ php example.php agent-skills
 | Target | Argument | Supported Versions | Coding Standards | Package Manager | Output |
 |--------|----------|--------------------|------------------|-----------------|--------|
 | Web | `web` | ES5+; Node.js >=18 for builds | [NPM Coding Style] | NPM | `examples/web/` |
-| Flutter | `flutter` | Dart >=2.17 <4; Flutter stable | [Effective Dart] | pub | `examples/flutter/` |
+| Flutter | `flutter` | Dart >=3.7 <4; Flutter >=3.29 | [Effective Dart] | pub | `examples/flutter/` |
 | Apple | `apple` | iOS 15+, macOS 11+, watchOS 7+, tvOS 13+ | [Swift Style Guide] | Swift Package Manager | `examples/apple/` |
-| Android | `android` | Android 5.0+; Java 17 in CI | [Android style guide] | Gradle, Maven | `examples/android/` |
+| Android | `android` | Android 6.0+; Java 17 in CI | [Android style guide] | Gradle, Maven | `examples/android/` |
 | React Native | `react-native` | React Native >=0.76.7 <1.0.0; Node.js >=18 | [NPM Coding Style] | NPM | `examples/react-native/` |
 | Godot | `godot` | Godot 4.6+ | [GDScript Style Guide] | Native | `examples/godot/` |
 
@@ -211,7 +235,7 @@ php example.php agent-skills
 | Python | `python` | Python >=3.9 | [PEP8] | pip | `examples/python/` |
 | Ruby | `ruby` | Ruby 3.1 in CI | [Ruby Style Guide] | RubyGems, Bundler | `examples/ruby/` |
 | Dart | `dart` | Dart >=2.17 <4 | [Effective Dart] | pub | `examples/dart/` |
-| Go | `go` | Go 1.22.5 | [Effective Go] | Go modules | `examples/go/` |
+| Go | `go` | Go 1.26.5 | [Effective Go] | Go modules | `examples/go/` |
 | Swift | `swift` | Swift 5.1+; Swift 5.9.2 in CI | [Swift Style Guide] | Swift Package Manager | `examples/swift/` |
 | .NET | `dotnet` | .NET Standard 2.0; .NET Framework 4.6.2 | [C# Coding Conventions] | NuGet | `examples/dotnet/` |
 | Kotlin | `kotlin` | JVM 1.8 target; Java 17 in CI | [Kotlin style guide] | Gradle, Maven | `examples/kotlin/` |
@@ -222,12 +246,14 @@ php example.php agent-skills
 
 | Target | Argument | Supported Versions | Coding Standards | Package Manager | Output |
 |--------|----------|--------------------|------------------|-----------------|--------|
-| CLI | `cli` | Node.js 20 and Bun 1.3.11 in CI | [NPM Coding Style] | NPM, Bun, native binaries | `examples/cli/` |
+| CLI | `cli` | Go 1.26.5 | [Effective Go] | Go modules, native binaries, NPM | `examples/cli/` |
 | REST examples | `rest` | N/A | Markdown | N/A | `examples/REST/` |
 | GraphQL | `graphql` | N/A | GraphQL | N/A | `examples/graphql/` |
-| Agent Skills | `agent-skills` | N/A | Markdown | N/A | `examples/agent-skills/` |
+| Skills | `skills` | N/A | Markdown | N/A | `examples/skills/` |
 | Cursor Plugin | `cursor-plugin` | N/A | Markdown | N/A | `examples/cursor-plugin/` |
 | Claude Plugin | `claude-plugin` | N/A | Markdown | N/A | `examples/claude-plugin/` |
+| Codex Plugin | `codex-plugin` | N/A | Markdown | N/A | `examples/codex-plugin/` |
+| Zed Extension | `zed-extension` | Zed extension API 0.7.0 | Rust | Cargo | `examples/zed-extension/` |
 
 [PHP FIG]: https://www.php-fig.org/
 [NPM Coding Style]: https://docs.npmjs.com/misc/coding-style

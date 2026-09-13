@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace Tests\E2E;
 
 use Exception;
-use RecursiveIteratorIterator;
-use RecursiveDirectoryIterator;
-use FilesystemIterator;
+use Override;
 use Throwable;
 use Appwrite\SDK\Language;
 use Appwrite\SDK\SDK;
-use Appwrite\Spec\OpenAPI3;
+use Utopia\OpenAPI\Parser;
 use PHPUnit\Framework\TestCase;
 use Twig\Error\LoaderError;
 use Twig\Error\RuntimeError;
@@ -51,6 +49,20 @@ abstract class Base extends TestCase
         'GET:/v1/mock/tests/general/path/grant%2Fspecial%26id:passed',
     ];
 
+    // One behavioral contract, invoked by each SDK's language adapter.
+    // The mock never emits these errors: reaching it cannot pass the rejection checks.
+    protected const PATH_VALIDATION_RESPONSES = [
+        'Missing required parameter: "id"',
+        'Missing required parameter: "plain"',
+        'GET:/v1/mock/tests/general/path-validation/0/0:passed',
+    ];
+
+    // Dart/Flutter, Kotlin/Android, Swift/Apple and Rust keep a null path
+    // segment as literal "null", never as an empty segment.
+    protected const NULL_PATH_RESPONSE = [
+        'GET:/v1/mock/tests/general/path-validation/null/0:passed',
+    ];
+
     protected const OAUTH_RESPONSES = [
         'https://localhost?code=abcdef&state=123456',
     ];
@@ -71,6 +83,15 @@ abstract class Base extends TestCase
     protected const MODEL_RESPONSES = [
         'POST:/v1/mock/tests/general/models:passed',
         'POST:/v1/mock/tests/general/models/array:passed',
+    ];
+
+    protected const OBJECT_ARRAY_RESPONSES = [
+        'POST:/v1/mock/tests/general/documents:passed',
+    ];
+
+    protected const OPTIONAL_PARAM_RESPONSES = [
+        'width=-1,height=128,name=omitted',
+        'width=0,height=64,name=zero',
     ];
 
     protected const UNION_RESPONSES = [
@@ -94,18 +115,6 @@ abstract class Base extends TestCase
         'POST:/v1/mock/tests/general/upload:passed',
     ];
 
-    protected const EXCLUDED_FIXTURE_TOKENS = [
-        'zzexcludedservice',
-        'zzexcludedpayload',
-        'zzexcludedresult',
-        'zzexcludedstatus',
-        'zzexcludedchild',
-        'zzexcludedchildstatus',
-        'zzexcludedmethodpayload',
-        'zzexcludedmethodresult',
-        'zzexcludedmethodstatus',
-    ];
-
     /**
      * 'Mock 400 error'                              -> message
      * '{"message":"Mock 400 error","code":400}'     -> response
@@ -124,6 +133,7 @@ abstract class Base extends TestCase
         'WS:/v1/realtime:passed',
         'WS:/v1/realtime:passed',
         'Realtime failed!',
+        'Realtime error:passed',
         'Realtime unsubscribe:passed',
         'Realtime update:passed',
         'Realtime presence:passed',
@@ -175,6 +185,9 @@ abstract class Base extends TestCase
         '{"method":"distanceGreaterThan","attribute":"location","values":[[[40.7128,-74],1000,true]]}',
         '{"method":"distanceLessThan","attribute":"location","values":[[[40.7128,-74],1000,true]]}',
         '{"method":"distanceLessThan","attribute":"location","values":[[[40.7128,-74],1000,true]]}',
+        '{"method":"vectorDot","attribute":"embedding","values":[[0.1,0.2,0.3]]}',
+        '{"method":"vectorCosine","attribute":"embedding","values":[[0.1,0.2,0.3]]}',
+        '{"method":"vectorEuclidean","attribute":"embedding","values":[[0.1,0.2,0.3]]}',
         '{"method":"intersects","attribute":"location","values":[[40.7128,-74]]}',
         '{"method":"notIntersects","attribute":"location","values":[[40.7128,-74]]}',
         '{"method":"crosses","attribute":"location","values":[[40.7128,-74]]}',
@@ -222,7 +235,7 @@ abstract class Base extends TestCase
     protected const CLI_CONSOLE_URL_RESPONSES = [
         'https://cloud.appwrite.io/console/project-sgp-chirag-project-prod/sites/site-chirag-profile-website/deployments/deployment-123',
         'https://cloud.appwrite.io/console/project-sgp-chirag-project-prod/functions/function-sample-function/deployment-123',
-        'https://abc.example.com/console/project-self-hosted-project/sites/site-docs/deployments/deployment-456',
+        'https://abc.example.com/console/project-default-self-hosted-project/sites/site-docs/deployments/deployment-456',
     ];
 
     protected const CLI_HEADERS_RESPONSES = [
@@ -257,10 +270,18 @@ abstract class Base extends TestCase
         'auth:authorization-pending-error:passed',
         'auth:session-account-key:passed',
         'auth:session-local-only:passed',
+        'auth:refresh-token-keyring-storage:passed',
+        'auth:refresh-token-prefs-fallback:passed',
         'auth:session-legacy:passed',
         'auth:session-has-auth:passed',
         'auth:plan-session-logout:passed',
+        'auth:logout-question-choices:passed',
+        'auth:logout-skips-empty-prompt:passed',
+        'auth:logout-single-account-ignores-current-stub:passed',
         'auth:restore-current-session-fallback:passed',
+        'auth:client-endpoint-session-reuse:passed',
+        'auth:whoami-signed-in-account-hint:passed',
+        'auth:client-reset-confirmation:passed',
         'auth:poll-device-token-success:passed',
         'auth:poll-device-token-retry:passed',
         'auth:poll-device-token-error:passed',
@@ -270,8 +291,41 @@ abstract class Base extends TestCase
         'auth:poll-device-token-default-interval:passed',
         'auth:valid-access-token-cached:passed',
         'auth:valid-access-token-missing-expiry:passed',
-        'auth:oauth-login-flag:passed',
+        'auth:valid-access-token-session-endpoint:passed',
+        'auth:project-session-endpoint-mismatch:passed',
+        'auth:organization-header:passed',
+        'auth:project-id-override:passed',
+        'auth:cloud-login-rejects-credentials:passed',
+        'auth:login-switch-selectors:passed',
+        'auth:login-switch-headless:passed',
+        'auth:login-switch-rejects-credentials:passed',
         'auth:open-browser:passed',
+        'auth:context-organization-lookup:passed',
+        'auth:context-project-precedence:passed',
+    ];
+
+    protected const CLI_REGRESSION_RESPONSES = [
+        'CLI_ERROR_HANDLING:passed',
+        'CLI_CONSOLE_FALLBACKS:passed',
+    ];
+
+    protected const CLI_ATTRIBUTE_SYNC_RESPONSES = [
+        'attribute:in-place-updates:passed',
+        'attribute:recreates-immutable:passed',
+        'attribute:ignores-derived-fields:passed',
+        'attribute:omitted-encrypt-not-recreate:passed',
+        'attribute:index-columns-change:passed',
+        'attribute:attribute-delete-uses-attribute-waiter:passed',
+        'attribute:update-guards:passed',
+        'attribute:resize-hard-fail:passed',
+        'attribute:rename-in-place:passed',
+        'attribute:rename-already-applied:passed',
+        'attribute:rename-missing-both-creates:passed',
+        'attribute:rename-both-exist-deletes-old:passed',
+        'attribute:rename-plus-field-change:passed',
+        'attribute:rename-preserves-indexes:passed',
+        'attribute:rename-hard-fail-before-delete:passed',
+        'attribute:rename-schema-validation:passed',
     ];
 
     protected const CLI_LOCAL_FUNCTION_EMULATION_RESPONSES = [
@@ -281,8 +335,9 @@ abstract class Base extends TestCase
 
     protected const HEADERS_RESPONSE = '__HEADERS_RESPONSE__';
 
-    protected const CLI_RUNTIME_RENDERING_RESPONSES = [
+    protected const CLI_RESPONSE_RENDERING_RESPONSES = [
         'CLI_RUNTIME_RENDERING:passed',
+        'CLI_DEPLOYMENT_RENDERING:passed',
     ];
 
     protected const CLI_QUERY_HELPER_RESPONSES = [
@@ -378,15 +433,25 @@ abstract class Base extends TestCase
     protected string $sdkLanguage;
     protected string $version;
 
+    #[Override]
     public function setUp(): void
     {
         \array_unshift($this->expectedOutput, $this->getExpectedSdkHeaders());
 
-        \exec('
-            cd ./mock-server && \
-            docker compose build && \
-            docker compose up -d --force-recreate
-        ');
+        $output = [];
+        $status = 0;
+
+        \exec(
+            'cd ./mock-server && docker compose build && docker compose up -d --force-recreate 2>&1',
+            $output,
+            $status
+        );
+
+        if ($status !== 0) {
+            $this->fail(
+                "Failed to start mock-server (exit {$status}):\n" . \implode("\n", $output)
+            );
+        }
     }
 
     protected function getExpectedSdkHeaders(): string
@@ -394,6 +459,7 @@ abstract class Base extends TestCase
         return "x-sdk-name: {$this->sdkName}; x-sdk-platform: {$this->sdkPlatform}; x-sdk-language: {$this->sdkLanguage}; x-sdk-version: {$this->version}";
     }
 
+    #[Override]
     public function tearDown(): void
     {
         // Remove the mock server so local test runs don't leave containers behind
@@ -417,7 +483,7 @@ abstract class Base extends TestCase
             throw new Exception('Failed to parse spec.');
         }
 
-        $sdk = new SDK($this->getLanguage(), new OpenAPI3($spec));
+        $sdk = new SDK($this->getLanguage(), Parser::parse($spec));
 
         $sdk
             ->setName($this->sdkName)
@@ -457,7 +523,6 @@ abstract class Base extends TestCase
         $this->rmdirRecursive($dir);
 
         $sdk->generate(__DIR__ . '/sdks/' . $this->language);
-        $this->assertExcludedFixtureWasRemoved($dir);
 
         /**
          * Build SDK
@@ -465,7 +530,17 @@ abstract class Base extends TestCase
         foreach ($this->build as $command) {
             echo "Build Executing: {$command}\n";
 
-            exec($command);
+            $buildOutput = [];
+            $status = 0;
+
+            exec($command . ' 2>&1', $buildOutput, $status);
+
+            echo \implode("\n", $buildOutput) . "\n";
+
+            // A build step that produces no artifact -- `go test`, a linter --
+            // used to fail in silence, because only the exit codes of steps
+            // that something later reads were ever noticed.
+            $this->assertSame(0, $status, "Build command failed: {$command}");
         }
 
         $output = [];
@@ -520,41 +595,6 @@ abstract class Base extends TestCase
             }
         }
         \rmdir($dir);
-    }
-
-    private function assertExcludedFixtureWasRemoved(string $dir): void
-    {
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)
-        );
-
-        foreach ($iterator as $file) {
-            $path = \strtolower((string) $file->getPathname());
-
-            foreach (self::EXCLUDED_FIXTURE_TOKENS as $token) {
-                $this->assertStringNotContainsString($token, $path, "Excluded fixture leaked into generated path: {$path}");
-            }
-
-            if (!$file->isFile()) {
-                continue;
-            }
-
-            $contents = \file_get_contents($file->getPathname());
-
-            if ($contents === false) {
-                continue;
-            }
-
-            $contents = \strtolower($contents);
-
-            foreach (self::EXCLUDED_FIXTURE_TOKENS as $token) {
-                $this->assertStringNotContainsString(
-                    $token,
-                    $contents,
-                    "Excluded fixture leaked into generated file: {$file->getPathname()}"
-                );
-            }
-        }
     }
 
     public function getLanguage(): Language

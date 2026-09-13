@@ -67,6 +67,17 @@ void main() async {
   final res = await general.redirect();
   print(res['result']);
 
+  for (final ids in [['', '0'], ['0', '']]) {
+    try {
+      await general.validatePath(id: ids[0], plain: ids[1]);
+      throw StateError('Empty path parameter was accepted');
+    } on AppwriteException catch (e) {
+      print(e.message);
+    }
+  }
+  print((await general.validatePath(id: '0', plain: '0')).result);
+  print((await general.validatePath(id: null, plain: '0')).result);
+
   var file = InputFile.fromPath(path: '../../../resources/file.png', filename: 'file.png');
   response = await general.upload(x: 'string', y: 123, z: ['string in array'], file: file);
   print(response.result);
@@ -86,6 +97,9 @@ void main() async {
   file = InputFile.fromBytes(bytes: bytes, filename: 'large_file.mp4');
   response = await general.upload(x: 'string', y: 123, z: ['string in array'], file: file);
   print(response.result);
+
+  final download = await general.download();
+  print(utf8.decode(download));
 
   response = await general.xenum(mockType: MockType.first);
   print(response.result);
@@ -187,6 +201,9 @@ void main() async {
   print(Query.distanceGreaterThan("location", [40.7128, -74], 1000, true));
   print(Query.distanceLessThan("location", [40.7128, -74], 1000));
   print(Query.distanceLessThan("location", [40.7128, -74], 1000, true));
+  print(Query.vectorDot("embedding", [0.1, 0.2, 0.3]));
+  print(Query.vectorCosine("embedding", [0.1, 0.2, 0.3]));
+  print(Query.vectorEuclidean("embedding", [0.1, 0.2, 0.3]));
 
   // Spatial query tests
   print(Query.intersects("location", [40.7128, -74]));

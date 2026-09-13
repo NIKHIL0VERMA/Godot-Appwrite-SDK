@@ -9,7 +9,8 @@ const {
     MockType,
     Foo,
     Bar,
-    General
+    General,
+    AppwriteException
 } = require('./dist/index.js');
 const { InputFile } = require('./dist/inputFile.js');
 const { readFile } = require('fs/promises');
@@ -145,6 +146,18 @@ async function start() {
     response = await general.redirect();
     console.log(response.result);
 
+    for (const [id, plain] of [['', '0'], ['0', '']]) {
+        try {
+            await general.validatePath({ id, plain });
+            throw new Error('Empty path parameter was accepted');
+        } catch (error) {
+            if (!(error instanceof AppwriteException)) throw error;
+            console.log(error.message);
+        }
+    }
+    response = await general.validatePath({ id: '0', plain: '0' });
+    console.log(response.result);
+
     response = await general.getPath({ pathId: 'grant/special&id' });
     console.log(response.result);
 
@@ -202,6 +215,9 @@ async function start() {
     });
     console.log(response.result);
 
+    // Download
+    console.log(new TextDecoder().decode(await general.download()));
+
     // Enum
     response = await general.enum(MockType.First);
     console.log(response.result);
@@ -214,6 +230,13 @@ async function start() {
         { id: 'player1', name: 'John Doe', score: 100 },
         { id: 'player2', name: 'Jane Doe', score: 200 }
     ]);
+    console.log(response.result);
+
+    // All-optional positional params keep their trailing arguments
+    response = await general.getOptional(undefined, 128, 'omitted');
+    console.log(response.result);
+
+    response = await general.getOptional(0, 64, 'zero');
     console.log(response.result);
 
     try {
@@ -303,6 +326,9 @@ async function start() {
     console.log(Query.distanceGreaterThan("location", [40.7128, -74], 1000, true));
     console.log(Query.distanceLessThan("location", [40.7128, -74], 1000));
     console.log(Query.distanceLessThan("location", [40.7128, -74], 1000, true));
+    console.log(Query.vectorDot("embedding", [0.1, 0.2, 0.3]));
+    console.log(Query.vectorCosine("embedding", [0.1, 0.2, 0.3]));
+    console.log(Query.vectorEuclidean("embedding", [0.1, 0.2, 0.3]));
 
     // Spatial query tests
     console.log(Query.intersects("location", [40.7128, -74]));

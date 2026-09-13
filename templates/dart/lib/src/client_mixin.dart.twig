@@ -12,7 +12,6 @@ mixin ClientMixin {
     required Map<String, String> headers,
     required Map<String, dynamic> params,
   }) {
-
     http.BaseRequest request = http.Request(method.name(), uri);
     if (headers['content-type'] == 'multipart/form-data') {
       request = http.MultipartRequest(method.name(), uri);
@@ -74,7 +73,8 @@ mixin ClientMixin {
       headers['User-Agent'] = Uri.encodeFull(headers['User-Agent']!);
     }
     if (headers['X-Forwarded-User-Agent'] != null) {
-      headers['X-Forwarded-User-Agent'] = Uri.encodeFull(headers['X-Forwarded-User-Agent']!);
+      headers['X-Forwarded-User-Agent'] =
+          Uri.encodeFull(headers['X-Forwarded-User-Agent']!);
     }
 
     request.headers.addAll(headers);
@@ -84,22 +84,33 @@ mixin ClientMixin {
   Response prepareResponse(http.Response res, {ResponseType? responseType}) {
     responseType ??= ResponseType.json;
 
-    String? warnings = res.headers['x-{{ spec.title | lower }}-warning'];
+    String? warnings = res.headers['x-{{ spec.info.title | lower }}-warning'];
     if (warnings != null) {
       warnings.split(';').forEach((warning) => log('Warning: $warning'));
     }
 
     if (res.statusCode >= 400) {
-      if ((res.headers['content-type'] ?? '').contains('application/json')) {
+      final isJson =
+          (res.headers['content-type'] ?? '').contains('application/json');
+      // Empty bodies still arrive with application/json (e.g. truncated
+      // proxy/edge errors). Avoid FormatException from json.decode('').
+      if (isJson && res.body.isNotEmpty) {
         final response = json.decode(res.body);
-        throw {{spec.title | caseUcfirst}}Exception(
+        throw {{spec.info.title | caseUcfirst}}Exception(
           response['message'],
           response['code'],
           response['type'],
           res.body,
         );
       } else {
-        throw {{spec.title | caseUcfirst}}Exception(res.body, res.statusCode, '', res.body);
+        throw {{spec.info.title | caseUcfirst}}Exception(
+          res.body.isEmpty
+              ? 'Unexpected empty response with status ${res.statusCode}'
+              : res.body,
+          res.statusCode,
+          '',
+          res.body,
+        );
       }
     }
     dynamic data;
@@ -121,18 +132,23 @@ mixin ClientMixin {
     return Response(data: data);
   }
 
-  Future<http.Response> toResponse(http.StreamedResponse streamedResponse) async {
-    if(streamedResponse.statusCode == 204) {
-        return http.Response('',
-          streamedResponse.statusCode,
-          headers: streamedResponse.headers.map((k,v) => k.toLowerCase()=='content-type' ? MapEntry(k, 'text/plain') : MapEntry(k,v)),
-          request: streamedResponse.request,
-          isRedirect: streamedResponse.isRedirect,
-          persistentConnection: streamedResponse.persistentConnection,
-          reasonPhrase: streamedResponse.reasonPhrase,
-        );
-      } else {
-        return await http.Response.fromStream(streamedResponse);
-      }
+  Future<http.Response> toResponse(
+      http.StreamedResponse streamedResponse) async {
+    if (streamedResponse.statusCode == 204) {
+      return http.Response(
+        '',
+        streamedResponse.statusCode,
+        headers: streamedResponse.headers.map((k, v) =>
+            k.toLowerCase() == 'content-type'
+                ? MapEntry(k, 'text/plain')
+                : MapEntry(k, v)),
+        request: streamedResponse.request,
+        isRedirect: streamedResponse.isRedirect,
+        persistentConnection: streamedResponse.persistentConnection,
+        reasonPhrase: streamedResponse.reasonPhrase,
+      );
+    } else {
+      return await http.Response.fromStream(streamedResponse);
+    }
   }
 }

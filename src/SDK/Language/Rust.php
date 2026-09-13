@@ -2,12 +2,22 @@
 
 namespace Appwrite\SDK\Language;
 
+use Utopia\OpenAPI\Model\ArraySchema;
+use Utopia\OpenAPI\Model\Operation;
+use Utopia\OpenAPI\Model\Parameter;
+use Utopia\OpenAPI\Model\Schema;
+use Utopia\OpenAPI\Model\StringSchema;
+use Utopia\OpenAPI\Specification;
 use Override;
 use Appwrite\SDK\Language;
 use Twig\TwigFilter;
 
 class Rust extends Language
 {
+    protected const RUSTFMT_MAX_WIDTH = 100;
+    protected const RUSTFMT_FN_CALL_WIDTH = 60;
+    protected const RUSTFMT_CHAIN_WIDTH = 60;
+
     #[Override]
     protected $params = [
         "cratePackage" => "packageName",
@@ -144,7 +154,7 @@ class Rust extends Language
             ],
             [
                 "scope" => "method",
-                "destination" => "docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md",
+                "destination" => "docs/examples/{{service.name | caseLower}}/{{(method | methodName) | caseKebab}}.md",
                 "template" => "rust/docs/example.md.twig",
             ],
             [
@@ -225,12 +235,12 @@ class Rust extends Language
 
             [
                 "scope" => "definition",
-                "destination" => "src/models/{{ definition.name | caseSnake }}.rs",
+                "destination" => "src/models/{{ definitionName | caseSnake }}.rs",
                 "template" => "rust/src/models/model.rs.twig",
             ],
             [
                 "scope" => "requestModel",
-                "destination" => "src/models/{{ requestModel.name | caseSnake }}.rs",
+                "destination" => "src/models/{{ requestModelName | caseSnake }}.rs",
                 "template" => "rust/src/models/request_model.rs.twig",
             ],
             [
@@ -240,7 +250,7 @@ class Rust extends Language
             ],
             [
                 "scope" => "enum",
-                "destination" => "src/enums/{{ enum.name | caseSnake }}.rs",
+                "destination" => "src/enums/{{ enum.title | caseSnake }}.rs",
                 "template" => "rust/src/enums/enum.rs.twig",
             ],
             [
@@ -266,52 +276,32 @@ class Rust extends Language
         ];
     }
 
-    public function getTypeName(array $parameter, array $spec = []): string
+    public function getTypeName(Schema|Parameter $parameter, ?Specification $spec = null): string
     {
-        $isArray = (($parameter["type"] ?? null) === self::TYPE_ARRAY);
-
-        // Handle enum types
-        if (!$isArray && isset($parameter["enumName"])) {
-            return "crate::enums::" . ucfirst($parameter["enumName"]);
-        }
-        if (!$isArray && !empty($parameter["enumValues"])) {
-            return "crate::enums::" . ucfirst($parameter["name"]);
-        }
-        if ($isArray && isset($parameter["enumName"])) {
-            return "Vec<crate::enums::" . ucfirst($parameter["enumName"]) . ">";
-        }
-        if ($isArray && !empty($parameter["enumValues"])) {
-            return "Vec<crate::enums::" . ucfirst($parameter["name"]) . ">";
+        $schema = $this->getSchema($parameter);
+        if ($this->usesEnumType($parameter)) {
+            $type = 'crate::enums::' . $this->toPascalCase($this->getSchemaEnumName($parameter, $spec));
+            return $schema instanceof ArraySchema ? 'Vec<' . $type . '>' : $type;
         }
 
-        if (
-            isset($parameter["type"]) && $parameter["type"] === "array" &&
-            isset($parameter["items"]["type"]) && $parameter["items"]["type"] === "object" &&
-            !isset($parameter["items"]["model"]) &&
-            !isset($parameter["items"]['$ref'])
-        ) {
-            return "Vec<serde_json::Value>";
+        $model = $schema instanceof ArraySchema
+            ? $this->getArraySchemaModel($schema)
+            : $this->getSchemaModel($schema);
+        if ($model !== null) {
+            $type = $model === 'any' ? 'serde_json::Value' : 'crate::models::' . $this->toPascalCase($model);
+            return $schema instanceof ArraySchema ? 'Vec<' . $type . '>' : $type;
         }
-        if (isset($parameter["items"])) {
-            // Map definition nested type to parameter nested type
-            $parameter["array"] = $parameter["items"];
-        }
-
-        return match ($parameter["type"]) {
-            self::TYPE_INTEGER => "i64",
-            self::TYPE_NUMBER => "f64",
-            self::TYPE_FILE => "InputFile",
-            self::TYPE_STRING => "String",
-            self::TYPE_BOOLEAN => "bool",
-            self::TYPE_OBJECT => "serde_json::Value",
-            self::TYPE_ARRAY => isset($parameter["array"]["model"])
-            ? "Vec<crate::models::" . ucfirst($parameter["array"]["model"]) . ">"
-            : (!empty(($parameter["array"] ?? [])["type"]) && !\is_array($parameter["array"]["type"])
-                ? "Vec<" . $this->getTypeName($parameter["array"]) . ">"
-                : "Vec<String>"),
-            default => isset($parameter["model"])
-            ? "crate::models::" . ucfirst($parameter["model"])
-            : $parameter["type"],
+        return match ($this->getSchemaType($parameter)) {
+            self::TYPE_INTEGER => 'i64',
+            self::TYPE_NUMBER => 'f64',
+            self::TYPE_FILE => 'InputFile',
+            self::TYPE_STRING => 'String',
+            self::TYPE_BOOLEAN => 'bool',
+            self::TYPE_OBJECT => 'serde_json::Value',
+            self::TYPE_ARRAY => $this->isUntypedNestedArray($parameter, $schema)
+            ? 'Vec<Vec<String>>'
+            : 'Vec<' . $this->getTypeName($schema->items) . '>',
+            default => 'serde_json::Value',
         };
     }
 
@@ -330,11 +320,11 @@ class Rust extends Language
         return 'vec![' . $elements . ']';
     }
 
-    public function getParamDefault(array $param): string
+    public function getParamDefault(Schema|Parameter $param): string
     {
-        $type = $param["type"] ?? "";
-        $default = $param["default"] ?? "";
-        $required = $param["required"] ?? "";
+        $type = $this->getSchemaType($param);
+        $default = $this->getSchemaDefault($param);
+        $required = $param instanceof Parameter && $param->required;
 
         if ($required) {
             return "";
@@ -391,10 +381,10 @@ class Rust extends Language
         return $output;
     }
 
-    public function getParamExample(array $param, string $lang = '', array $spec = []): string
+    public function getParamExample(Schema|Parameter $param, string $lang = '', array $spec = []): string
     {
-        $type = $param["type"] ?? "";
-        $example = $param["example"] ?? "";
+        $type = $this->getSchemaType($param);
+        $example = $this->getSchemaExample($param);
 
         $output = "";
 
@@ -440,7 +430,7 @@ class Rust extends Language
                         return $this->getPermissionExample($example);
                     }
 
-                    $items = $param["items"] ?? $param["array"] ?? [];
+                    $items = $this->getArraySchema($param) ?? $this->getSchema($param);
 
                     if (\is_string($example) && $example !== "") {
                         $decoded = json_decode($example, true);
@@ -508,6 +498,67 @@ class Rust extends Language
         return $this->getArrayOf(implode(", ", $permissions));
     }
 
+    protected function getInputType(Schema|Parameter $property, ?Specification $spec = null): string
+    {
+        return match ($type = $this->getTypeName($property, $spec)) {
+            'String' => 'impl Into<String>',
+            'Vec<String>' => 'impl IntoIterator<Item = impl Into<String>>',
+            default => $type,
+        };
+    }
+
+    protected function getParamValue(Schema|Parameter $property, string $paramName, ?Specification $spec = null): string
+    {
+        return match ($this->getTypeName($property, $spec)) {
+            'String' => $paramName . '.into()',
+            'Vec<String>' => $paramName . '.into_iter().map(|s| s.into()).collect::<Vec<String>>()',
+            default => $paramName,
+        };
+    }
+
+    protected function getReturnType(Operation $method, Specification $spec): string
+    {
+        return match ($this->getMethodType($method, $spec)) {
+            'webAuth' => 'crate::error::Result<String>',
+            'location' => 'crate::error::Result<Vec<u8>>',
+            default => $this->getResponseReturnType($method),
+        };
+    }
+
+    protected function getResponseReturnType(Operation $method): string
+    {
+        $models = \array_values(\array_filter(
+            $this->getOperationResponseModels($method),
+            static fn(string $model): bool => $model !== 'any',
+        ));
+        if (\count($models) > 1) {
+            return 'crate::error::Result<serde_json::Value>';
+        }
+        if ($models !== []) {
+            return 'crate::error::Result<crate::models::' . $this->toPascalCase($models[0]) . '>';
+        }
+
+        // Response content determines whether a body exists, independently
+        // of the default Accept header used for content negotiation.
+        return $this->getProducedTypes($method) === []
+            ? 'crate::error::Result<()>'
+            : 'crate::error::Result<serde_json::Value>';
+    }
+
+    /** @return list<string> */
+    protected function getProducedTypes(Operation $method): array
+    {
+        $produces = [];
+        foreach ($method->responses as $response) {
+            foreach (\array_keys($response->content) as $contentType) {
+                if ($contentType !== '' && !\in_array($contentType, $produces, true)) {
+                    $produces[] = $contentType;
+                }
+            }
+        }
+        return $produces;
+    }
+
     #[Override]
     public function getFilters(): array
     {
@@ -515,96 +566,353 @@ class Rust extends Language
             new TwigFilter(
                 "rustdocComment",
                 function ($value, $indent = 0): string {
-                    $value = trim($value);
+                    $value = trim((string) $value);
                     $value = explode("\n", $value);
                     $indent = \str_repeat(" ", $indent);
                     foreach ($value as $key => $line) {
-                        $value[$key] = "/// " . wordwrap(trim($line), 75, "\n" . $indent . "/// ");
+                        $trimmed = trim($line);
+                        $value[$key] = $trimmed === ''
+                            ? "///"
+                            : "/// " . wordwrap($trimmed, 75, "\n" . $indent . "/// ");
                     }
                     return implode("\n" . $indent, $value);
                 },
                 ["is_safe" => ["html"]],
             ),
-            new TwigFilter("propertyType", fn(array $property, array $spec = [], string $generic = "serde_json::Value"): string => $this->getPropertyType($property, $spec, $generic)),
-            new TwigFilter("returnType", fn(array $method, array $spec, string $namespace, string $generic = "serde_json::Value"): string => $this->getReturnType($method, $spec, $namespace, $generic)),
+            new TwigFilter("rustfmtFn", fn(array $params, int $indent, string $prefix, string $returnType): string => $this->rustfmtFn($indent, $prefix, $params, $returnType), ["is_safe" => ["html"]]),
+            new TwigFilter("rustfmtCall", fn(array $args, int $indent, string $callee, string $terminator = ';'): string => $this->rustfmtCall($indent, $callee, $args, $terminator), ["is_safe" => ["html"]]),
+            new TwigFilter("rustfmtClientAwait", fn(array $args, int $indent, string $method): string => $this->rustfmtClientAwait($indent, $method, $args), ["is_safe" => ["html"]]),
+            new TwigFilter("rustfmtPath", fn(array $replaces, int $indent, string $path): string => $this->rustfmtPath($indent, $path, $replaces), ["is_safe" => ["html"]]),
+            new TwigFilter("rustfmtMatchArm", fn(string $value, int $indent, string $pattern): string => $this->rustfmtMatchArm($indent, $pattern, $value), ["is_safe" => ["html"]]),
+            new TwigFilter("rustfmtAssign", fn(string $rhs, int $indent, string $lhs, string $terminator = ';'): string => $this->rustfmtAssign($indent, $lhs, $rhs, $terminator), ["is_safe" => ["html"]]),
+            new TwigFilter("rustfmtChain", fn(string $suffix, int $indent, string $receiver): string => $this->rustfmtChain($indent, $receiver, $suffix), ["is_safe" => ["html"]]),
+            new TwigFilter("rustfmtHeaderInsert", fn(string $valueExpr, int $indent, string $key): string => $this->rustfmtHeaderInsert($indent, $key, $valueExpr), ["is_safe" => ["html"]]),
+            new TwigFilter("propertyType", fn(Schema $property, ?Specification $spec = null, string $generic = "serde_json::Value"): string => $this->getTypeName($property, $spec)),
+            new TwigFilter("returnType", fn(Operation $method, Specification $spec, string $namespace, string $generic = "serde_json::Value"): string => $this->getReturnType($method, $spec)),
             new TwigFilter("caseEnumKey", fn(string $value): string => $this->toPascalCase($value)),
-            new TwigFilter("docsArgumentExample", fn(array $param, string $crateName): string => $this->getDocsArgumentExample($param, $crateName), ["is_safe" => ["html"]]),
-            new TwigFilter("inputType", fn(array $property, array $spec = [], string $generic = "serde_json::Value"): string => $this->getInputType($property, $spec, $generic)),
-            new TwigFilter("paramValue", fn(array $property, string $paramName, array $spec = []): string => $this->getParamValue($property, $paramName, $spec), ["is_safe" => ["html"]]),
+            new TwigFilter("docsArgumentExample", function (Schema|Parameter $param, string $crateName): string {
+                if ($this->getSchemaType($param) === self::TYPE_FILE) {
+                    $value = $this->toCaseSnake($param instanceof Parameter ? $param->name : 'file');
+                    if (isset($this->getIdentifierOverrides()[$value])) {
+                        $value = $this->getIdentifierOverrides()[$value];
+                    }
+                } elseif ($this->getEnumSchema($param)->enum !== []) {
+                    $schema = $this->getSchema($param);
+                    $enumSchema = $this->getEnumSchema($param);
+                    $enumName = $this->toPascalCase($this->getSchemaEnumName($param));
+                    $example = $this->getSchemaExample($param) ?? $enumSchema->enum[0];
+
+                    // An array parameter carries its example as a JSON string,
+                    // so every member has to be resolved separately — searching
+                    // for the whole string finds nothing and silently renders
+                    // enum[0] instead.
+                    $members = [$example];
+                    if ($schema instanceof ArraySchema) {
+                        $decoded = \is_string($example) ? \json_decode($example, true) : $example;
+                        $members = \is_array($decoded) && $decoded !== [] ? $decoded : [$enumSchema->enum[0] ?? $example];
+                    }
+
+                    $keys = $this->resolveEnumKeys($param);
+                    $variants = [];
+                    foreach ($members as $member) {
+                        $index = \array_search($member, $enumSchema->enum, true);
+
+                        // An example that is not one of the enum's values names
+                        // no variant, so fall back to the first member rather
+                        // than inventing one from the example text.
+                        $key = match (true) {
+                            $index !== false && ($keys[$index] ?? '') !== '' => $keys[$index],
+                            $index !== false => $enumSchema->enum[$index],
+                            default => $keys[0] ?? $enumSchema->enum[0] ?? $member,
+                        };
+                        if ((string) $key === '') {
+                            continue;
+                        }
+                        $variants[] = $crateName . '::enums::' . $enumName . '::' . $this->toPascalCase((string) $key);
+                    }
+
+                    $value = $schema instanceof ArraySchema
+                        ? 'vec![' . \implode(', ', $variants) . ']'
+                        : ($variants[0] ?? '');
+                } else {
+                    $value = $this->getParamExample($param);
+                }
+                $required = $param instanceof Parameter && $param->required;
+                return $required && !$this->getSchema($param)->nullable ? $value : "Some({$value})";
+            }, ["is_safe" => ["html"]]),
+            new TwigFilter("inputType", fn(Schema|Parameter $property, ?Specification $spec = null, string $generic = "serde_json::Value"): string => $this->getInputType($property, $spec)),
+            new TwigFilter("paramValue", fn(Schema|Parameter $property, string $paramName, ?Specification $spec = null): string => $this->getParamValue($property, $paramName, $spec), ["is_safe" => ["html"]]),
             new TwigFilter("rustType", fn($value): string|array => str_replace(['&lt;', '&gt;'], ['<', '>'], $value), ["is_safe" => ["html"]]),
             new TwigFilter("rustCrateName", fn($value): string|array => str_replace('-', '_', $value)),
             new TwigFilter("stripProtocol", fn($value): string|array => str_replace(['https://', 'http://'], '', $value)),
         ];
     }
 
-    protected function getPropertyType(array $property, array $spec, string $generic = "serde_json::Value"): string
+    /**
+     * Layout a function signature the way rustfmt 1.83 does at max_width 100.
+     *
+     * @param list<string> $params
+     */
+    protected function rustfmtFn(int $indent, string $prefix, array $params, string $returnType): string
     {
-        if (\array_key_exists("sub_schemas", $property) && !empty($property["sub_schemas"])) {
-            return $property["type"] === "array" ? "Vec<serde_json::Value>" : "serde_json::Value";
+        $pad = str_repeat(' ', $indent);
+        $joined = implode(', ', $params);
+        $suffix = $returnType === '' ? ' {' : ' -> ' . $returnType . ' {';
+        $one = $pad . $prefix . '(' . $joined . ')' . $suffix;
+        if (strlen($one) <= self::RUSTFMT_MAX_WIDTH) {
+            return $one;
         }
 
-        if (\array_key_exists("sub_schema", $property)) {
-            $type = "crate::models::" . ucfirst((string) $property["sub_schema"]);
-
-            if ($property["type"] === "array") {
-                $type = "Vec<" . $type . ">";
-            }
-        } else {
-            $type = $this->getTypeName($property, $spec);
+        $lines = [$pad . $prefix . '('];
+        foreach ($params as $param) {
+            $lines[] = $pad . '    ' . $param . ',';
         }
+        $lines[] = $pad . ')' . $suffix;
 
-        return $type;
+        return implode("\n", $lines);
     }
 
     /**
-     * Get input type for method parameters (uses impl Into for better DX)
+     * Layout a function call the way rustfmt 1.83 does (fn_call_width 60, max_width 100).
+     *
+     * @param list<string> $args
      */
-    protected function getInputType(array $property, array $spec, string $generic = "serde_json::Value"): string
+    protected function rustfmtCall(int $indent, string $callee, array $args, string $terminator = ';'): string
     {
-        $baseType = $this->getPropertyType($property, $spec, $generic);
-
-        // For String types, accept impl Into<String> for better DX
-        if ($baseType === "String") {
-            return "impl Into<String>";
+        $pad = str_repeat(' ', $indent);
+        $joined = implode(', ', $args);
+        $one = $pad . $callee . '(' . $joined . ')' . $terminator;
+        if (strlen($joined) <= self::RUSTFMT_FN_CALL_WIDTH && strlen($one) <= self::RUSTFMT_MAX_WIDTH) {
+            return $one;
         }
 
-        // For Vec<String>, accept impl IntoIterator for better DX (accepts slices, vecs, arrays)
-        if ($baseType === "Vec<String>") {
-            return "impl IntoIterator<Item = impl Into<String>>";
+        $inner = str_repeat(' ', $indent + 4);
+        $lines = [$pad . $callee . '('];
+        foreach ($args as $arg) {
+            $lines[] = $inner . $this->rustfmtJsonArg($indent + 4, $arg) . ',';
+        }
+        $lines[] = $pad . ')' . $terminator;
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * rustfmt wraps method chains inside `json!(...)` when they exceed chain_width.
+     */
+    protected function rustfmtJsonArg(int $argIndent, string $arg): string
+    {
+        $prefix = 'json!(';
+        $marker = '.into_iter().map(|s| s.into()).collect::<Vec<String>>()';
+        if (!str_starts_with($arg, $prefix) || !str_ends_with($arg, ')')) {
+            return $arg;
         }
 
-        // For Vec<crate::enums::*>, keep as-is (enums don't benefit from Into)
-        if (preg_match('/^Vec<crate::enums::/', $baseType)) {
-            return $baseType;
+        $inner = substr($arg, strlen($prefix), -1);
+        if (!str_ends_with($inner, $marker) || strlen($inner) <= self::RUSTFMT_CHAIN_WIDTH) {
+            return $arg;
         }
 
-        // For Vec<crate::models::*>, keep as-is (models don't benefit from Into)
-        if (preg_match('/^Vec<crate::models::/', $baseType)) {
-            return $baseType;
+        $receiver = substr($inner, 0, -strlen($marker));
+        $innerPad = str_repeat(' ', $argIndent + 4);
+
+        return $prefix . $receiver . "\n"
+            . $innerPad . ".into_iter()\n"
+            . $innerPad . ".map(|s| s.into())\n"
+            . $innerPad . '.collect::<Vec<String>>())';
+    }
+
+    /**
+     * Layout `self.client.<method>(...).await` as a rustfmt method chain.
+     *
+     * @param list<string> $args
+     */
+    protected function rustfmtClientAwait(int $indent, string $method, array $args): string
+    {
+        $pad = str_repeat(' ', $indent);
+        $inner = str_repeat(' ', $indent + 4);
+        $joined = implode(', ', $args);
+        $call = '.' . $method . '(' . $joined . ')';
+        if (strlen($joined) <= self::RUSTFMT_FN_CALL_WIDTH && strlen($inner . $call) <= self::RUSTFMT_MAX_WIDTH) {
+            $callLine = $inner . $call;
+        } else {
+            $argPad = str_repeat(' ', $indent + 8);
+            $lines = [$inner . '.' . $method . '('];
+            foreach ($args as $arg) {
+                $lines[] = $argPad . $arg . ',';
+            }
+            $lines[] = $inner . ')';
+            $callLine = implode("\n", $lines);
         }
 
-        // For primitive types (i64, f64, bool), keep as-is
-        if (in_array($baseType, ['i64', 'f64', 'bool', 'InputFile', 'serde_json::Value'])) {
-            return $baseType;
+        return $pad . "self.client\n" . $callLine . "\n" . $inner . '.await';
+    }
+
+    /**
+     * Layout `let path = "...".to_string().replace(...)` the way rustfmt 1.83 does.
+     *
+     * @param list<string> $replaces Each entry starts with `.replace(...)`
+     */
+    protected function rustfmtPath(int $indent, string $path, array $replaces): string
+    {
+        $pad = str_repeat(' ', $indent);
+        $pathLit = '"' . $path . '"';
+        if ($replaces === []) {
+            return $pad . 'let path = ' . $pathLit . '.to_string();';
         }
 
-        // For enum types, keep as-is
-        if (str_starts_with($baseType, 'crate::enums::')) {
-            return $baseType;
+        $parts = [];
+        foreach ($replaces as $replace) {
+            if (preg_match('/^\.replace\("([^"]+)", (.+)\)$/', $replace, $match) !== 1) {
+                $parts[] = ['kind' => 'raw', 'raw' => $replace];
+                continue;
+            }
+            $parts[] = ['kind' => 'replace', 'key' => $match[1], 'expr' => $match[2]];
         }
 
-        // For model types, keep as-is
-        if (str_starts_with($baseType, 'crate::models::')) {
-            return $baseType;
+        $oneLineReplaces = '';
+        $allOneLine = true;
+        foreach ($parts as $part) {
+            if ($part['kind'] !== 'replace' || strlen('"' . $part['key'] . '", ' . $part['expr']) > self::RUSTFMT_FN_CALL_WIDTH) {
+                $allOneLine = false;
+                break;
+            }
+            $oneLineReplaces .= '.replace("' . $part['key'] . '", ' . $part['expr'] . ')';
         }
 
-        // For other Vec types with primitives
-        if (preg_match('/^Vec<(i64|f64|bool|serde_json::Value)>$/', $baseType)) {
-            return $baseType;
+        $rhsOne = $pathLit . '.to_string()' . $oneLineReplaces;
+        $fullOne = $pad . 'let path = ' . $rhsOne . ';';
+        if ($allOneLine && strlen($rhsOne) <= self::RUSTFMT_CHAIN_WIDTH && strlen($fullOne) <= self::RUSTFMT_MAX_WIDTH) {
+            return $fullOne;
         }
 
-        // Default: return base type as-is
-        return $baseType;
+        if (count($parts) === 1 && $parts[0]['kind'] === 'replace') {
+            $joined = '"' . $parts[0]['key'] . '", ' . $parts[0]['expr'];
+            $collapsedChain = $pathLit . '.to_string().replace(';
+            $prefix = $pad . 'let path = ' . $collapsedChain;
+            if (
+                strlen($joined) > self::RUSTFMT_FN_CALL_WIDTH
+                && strlen($collapsedChain) <= self::RUSTFMT_CHAIN_WIDTH
+                && strlen($prefix) <= self::RUSTFMT_MAX_WIDTH
+            ) {
+                return $prefix . "\n"
+                    . $this->rustfmtReplaceArgLines($indent + 4, $parts[0]['key'], $parts[0]['expr'])
+                    . $pad . ');';
+            }
+        }
+
+        $letLine = $pad . 'let path = ' . $pathLit;
+        if (strlen($letLine) > self::RUSTFMT_MAX_WIDTH) {
+            $chainIndent = $indent + 8;
+            $lines = [$pad . 'let path =', $pad . '    ' . $pathLit];
+        } else {
+            $chainIndent = $indent + 4;
+            $lines = [$letLine];
+        }
+
+        $chainPad = str_repeat(' ', $chainIndent);
+        $lines[] = $chainPad . '.to_string()';
+        foreach ($parts as $i => $part) {
+            $terminator = $i === array_key_last($parts) ? ';' : '';
+            if ($part['kind'] === 'raw') {
+                $lines[] = $chainPad . $part['raw'] . $terminator;
+                continue;
+            }
+            $lines[] = $this->rustfmtReplaceSegment($chainIndent, $part['key'], $part['expr'], $terminator);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    protected function rustfmtReplaceSegment(int $dotIndent, string $key, string $expr, string $terminator): string
+    {
+        $pad = str_repeat(' ', $dotIndent);
+        $joined = '"' . $key . '", ' . $expr;
+        $one = $pad . '.replace(' . $joined . ')' . $terminator;
+        if (strlen($joined) <= self::RUSTFMT_FN_CALL_WIDTH && strlen($one) <= self::RUSTFMT_MAX_WIDTH) {
+            return $one;
+        }
+
+        return $pad . ".replace(\n"
+            . $this->rustfmtReplaceArgLines($dotIndent + 4, $key, $expr)
+            . $pad . ')' . $terminator;
+    }
+
+    protected function rustfmtReplaceArgLines(int $argIndent, string $key, string $expr): string
+    {
+        $argPad = str_repeat(' ', $argIndent);
+
+        return $argPad . '"' . $key . "\",\n"
+            . $argPad . $this->rustfmtChainExpr($argIndent, $expr) . ",\n";
+    }
+
+    /**
+     * rustfmt splits long method chains onto one call per line (chain_width 60).
+     */
+    protected function rustfmtChainExpr(int $indent, string $expr): string
+    {
+        if (strlen($expr) <= self::RUSTFMT_CHAIN_WIDTH) {
+            return $expr;
+        }
+
+        $segments = preg_split('/(?=\.[A-Za-z_])/', $expr, -1, PREG_SPLIT_NO_EMPTY);
+        if ($segments === false || count($segments) < 2) {
+            return $expr;
+        }
+
+        $inner = str_repeat(' ', $indent + 4);
+
+        return $segments[0] . "\n" . $inner . implode("\n" . $inner, array_slice($segments, 1));
+    }
+
+    protected function rustfmtMatchArm(int $indent, string $pattern, string $value): string
+    {
+        $pad = str_repeat(' ', $indent);
+        $one = $pad . $pattern . ' => "' . $value . '",';
+        if (strlen($one) <= self::RUSTFMT_MAX_WIDTH) {
+            return $one;
+        }
+
+        return $pad . $pattern . " => {\n"
+            . $pad . '    "' . $value . "\"\n"
+            . $pad . '}';
+    }
+
+    protected function rustfmtAssign(int $indent, string $lhs, string $rhs, string $terminator = ';'): string
+    {
+        $pad = str_repeat(' ', $indent);
+        $one = $pad . $lhs . ' = ' . $rhs . $terminator;
+        if (strlen($one) <= self::RUSTFMT_MAX_WIDTH) {
+            return $one;
+        }
+
+        return $pad . $lhs . " =\n" . $pad . '    ' . $rhs . $terminator;
+    }
+
+    protected function rustfmtChain(int $indent, string $receiver, string $suffix): string
+    {
+        $pad = str_repeat(' ', $indent);
+        $one = $pad . $receiver . $suffix;
+        if (strlen($receiver . $suffix) <= self::RUSTFMT_CHAIN_WIDTH && strlen($one) <= self::RUSTFMT_MAX_WIDTH) {
+            return $one;
+        }
+
+        return $pad . $receiver . "\n" . $pad . '    ' . $suffix;
+    }
+
+    protected function rustfmtHeaderInsert(int $indent, string $key, string $valueExpr): string
+    {
+        $args = ['"' . $key . '"', $valueExpr];
+        $joined = implode(', ', $args);
+        $chainInsert = str_repeat(' ', $indent + 4) . '.insert(' . $joined . ');';
+        if (strlen($joined) <= self::RUSTFMT_FN_CALL_WIDTH && strlen($chainInsert) <= self::RUSTFMT_MAX_WIDTH) {
+            $pad = str_repeat(' ', $indent);
+
+            return $pad . "next.config\n"
+                . $pad . "    .headers\n"
+                . $chainInsert;
+        }
+
+        return $this->rustfmtCall($indent, 'next.config.headers.insert', $args);
     }
 
     /**
@@ -625,9 +933,9 @@ class Rust extends Language
         return implode('_', $ret);
     }
 
-    protected function formatArrayItemExample(mixed $value, array $items = []): string
+    protected function formatArrayItemExample(mixed $value, Schema $items): string
     {
-        $itemType = $items["type"] ?? null;
+        $itemType = $this->getSchemaType($items);
 
         return match ($itemType) {
             self::TYPE_INTEGER, self::TYPE_NUMBER => (string) $value,
@@ -640,181 +948,7 @@ class Rust extends Language
                     \is_int($value), \is_float($value) => (string) $value,
                     \is_array($value) => "serde_json::json!(" . json_encode($value, JSON_UNESCAPED_SLASHES) . ")",
                     default => "serde_json::Value::Null",
-            },
+                },
         };
-    }
-
-    protected function getEnumExample(array $param, string $prefix = ""): string
-    {
-        $enumValues = $param["enumValues"] ?? [];
-
-        if (empty($enumValues)) {
-            return $this->getParamExample($param);
-        }
-
-        $enumKeys = $param["enumKeys"] ?? [];
-        $enumName = $this->toPascalCase($param["enumName"] ?? $param["name"] ?? "");
-        $example = $param["example"] ?? null;
-        $isArray = ($param["type"] ?? "") === self::TYPE_ARRAY;
-
-        $resolveKey = function ($value) use ($enumValues, $enumKeys): string {
-            $index = array_search($value, $enumValues, true);
-
-            if ($index !== false && isset($enumKeys[$index]) && $enumKeys[$index] !== "") {
-                return $this->toPascalCase($enumKeys[$index]);
-            }
-
-            if ($index !== false && isset($enumValues[$index])) {
-                return $this->toPascalCase($enumValues[$index]);
-            }
-
-            $fallback = $enumKeys[0] ?? $enumValues[0] ?? $value;
-
-            return $this->toPascalCase((string) $fallback);
-        };
-
-        $enumPath = $prefix . $enumName . "::";
-
-        if ($isArray) {
-            $values = [];
-
-            if (\is_string($example) && $example !== "") {
-                $decoded = json_decode($example, true);
-
-                if (\is_array($decoded)) {
-                    $values = $decoded;
-                }
-            } elseif (\is_array($example)) {
-                $values = $example;
-            }
-
-            if ($values === []) {
-                $values = [$enumValues[0]];
-            }
-
-            $items = array_map(
-                fn($value): string => $enumPath . $resolveKey($value),
-                $values,
-            );
-
-            return "vec![" . implode(", ", $items) . "]";
-        }
-
-        $value = ($example !== null && $example !== "") ? $example : $enumValues[0];
-
-        return $enumPath . $resolveKey($value);
-    }
-
-    protected function getDocsArgumentExample(array $param, string $crateName): string
-    {
-        if (($param["type"] ?? "") === self::TYPE_FILE) {
-            $value = $this->toCaseSnake($param["name"] ?? "file");
-
-            if (isset($this->getIdentifierOverrides()[$value])) {
-                $value = $this->getIdentifierOverrides()[$value];
-            }
-
-            return (($param["required"] ?? false) && !($param["nullable"] ?? false)) ? $value : "Some({$value})";
-        }
-
-        if (!empty($param["enumValues"]) || !empty($param["enumName"])) {
-            $value = $this->getEnumExample($param, $crateName . "::enums::");
-        } else {
-            $value = $this->getParamExample($param);
-        }
-
-        return (($param["required"] ?? false) && !($param["nullable"] ?? false)) ? $value : "Some({$value})";
-    }
-
-    /**
-     * Get parameter value conversion expression for method body
-     */
-    protected function getParamValue(array $property, string $paramName, array $spec): string
-    {
-        $baseType = $this->getPropertyType($property, $spec);
-
-        // For String types with impl Into<String>, call .into()
-        if ($baseType === "String") {
-            return $paramName . ".into()";
-        }
-
-        // For Vec<String> with impl IntoIterator, map and collect
-        if ($baseType === "Vec<String>") {
-            return $paramName . ".into_iter().map(|s| s.into()).collect::<Vec<String>>()";
-        }
-
-        // For other types, use as-is
-        return $paramName;
-    }
-
-    protected function getReturnType(
-        array $method,
-        array $spec,
-        string $namespace,
-        string $generic = "serde_json::Value",
-    ): string {
-        if ($method["type"] === "webAuth") {
-            return "crate::error::Result<String>";
-        }
-        if ($method["type"] === "location") {
-            return "crate::error::Result<Vec<u8>>";
-        }
-
-        if (
-            \array_key_exists("responseModels", $method)
-            && \count($method["responseModels"]) > 1
-        ) {
-            return "crate::error::Result<serde_json::Value>";
-        }
-
-        $isEmpty = empty($method["produces"]) || (isset($method["responses"]) && $this->isEmptyResponse($method["responses"]));
-
-        if (
-            !\array_key_exists("responseModel", $method) ||
-            empty($method["responseModel"]) ||
-            $method["responseModel"] === "any"
-        ) {
-            if ($isEmpty) {
-                return "crate::error::Result<()>";
-            }
-            return "crate::error::Result<serde_json::Value>";
-        }
-
-        $ret = ucfirst((string) $method["responseModel"]);
-
-        return "crate::error::Result<crate::models::" . $ret . ">";
-    }
-
-    protected function isEmptyResponse(array $responses): bool
-    {
-        foreach (array_keys($responses) as $code) {
-            if (!in_array((int) $code, [204, 205])) {
-                return false;
-            }
-        }
-        return $responses !== [];
-    }
-
-    protected function hasGenericType(?string $model, array $spec): bool
-    {
-        if (empty($model) || $model === "any") {
-            return false;
-        }
-
-        $model = $spec["definitions"][$model];
-
-        if ($model["additionalProperties"] ?? false) {
-            return true;
-        }
-
-        foreach ($model["properties"] as $property) {
-            if (!\array_key_exists("sub_schema", $property) || !$property["sub_schema"]) {
-                continue;
-            }
-
-            return $this->hasGenericType($property["sub_schema"], $spec);
-        }
-
-        return false;
     }
 }

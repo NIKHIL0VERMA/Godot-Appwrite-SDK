@@ -5,11 +5,13 @@
          bootstrap="vendor/autoload.php"
          colors="true">
     <testsuites>
-        <testsuite name="Unit">
-            <directory>./tests/unit/</directory>
+        <testsuite name="Generation">
+            <directory>./tests/generation/</directory>
+            <exclude>./tests/generation/sdks</exclude>
         </testsuite>
         <testsuite name="E2E">
             <directory>./tests/e2e/</directory>
+            <exclude>./tests/e2e/sdks</exclude>
         </testsuite>
     </testsuites>
 </phpunit>

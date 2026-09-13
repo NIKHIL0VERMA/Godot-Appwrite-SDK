@@ -3,17 +3,17 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "{{ spec.title | caseSnake }}"
+name = "{{ language.params.pipPackage }}"
 version = "{{ sdk.version }}"
 description = "{{ sdk.shortDescription }}"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "{{ spec.licenseName }}" }
+license = { text = "{{ spec.info.license.name }}" }
 authors = [
-  { name = "{{ spec.contactName }}", email = "{{ spec.contactEmail }}" }
+  { name = "{{ spec.info.contact.name }}", email = "{{ spec.info.contact.email }}" }
 ]
 maintainers = [
-  { name = "{{ spec.contactName }}", email = "{{ spec.contactEmail }}" }
+  { name = "{{ spec.info.contact.name }}", email = "{{ spec.info.contact.email }}" }
 ]
 dependencies = [
   "requests",
@@ -34,12 +34,18 @@ classifiers = [
 
 [project.optional-dependencies]
 test = [
+  "black==25.11.0",
   "requests_mock==1.11.0",
 ]
 
 [project.urls]
-Homepage = "{{ spec.contactURL }}"
+Homepage = "{{ spec.info.contact.url }}"
 Repository = "https://github.com/{{ sdk.gitUserName }}/{{ sdk.gitRepoName }}"
 
+[tool.black]
+line-length = 120
+skip-string-normalization = true
+target-version = ['py39']
+
 [tool.setuptools.packages.find]
-include = ["{{ spec.title | caseSnake }}*"]
+include = ["{{ namespace | caseSnake }}*"]

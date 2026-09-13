@@ -13,7 +13,9 @@ async function start() {
   let Condition = appwrite.Condition;
 
   // Init SDK
-  let client = new appwrite.Client().addHeader("Origin", "http://localhost");
+  let client = new appwrite.Client()
+    .addHeader("Origin", "http://localhost")
+    .setProject("console");
 
   let foo = new appwrite.Foo(client);
   let bar = new appwrite.Bar(client);
@@ -73,6 +75,18 @@ async function start() {
   // @ts-ignore
   console.log(response.result);
 
+  for (const [id, plain] of [["", "0"], ["0", ""]]) {
+    try {
+      await general.validatePath(plain, id);
+      throw new Error("Empty path parameter was accepted");
+    } catch (error) {
+      if (!(error instanceof appwrite.AppwriteException)) throw error;
+      console.log(error.message);
+    }
+  }
+  response = await general.validatePath("0", "0");
+  console.log(response.result);
+
   response = await general.upload(
     "string",
     123,
@@ -113,6 +127,8 @@ async function start() {
   );
   // @ts-ignore
   console.log(response.result);
+
+  console.log(new TextDecoder().decode(await general.download()));
 
   response = await general.enum(appwrite.MockType.First);
   // @ts-ignore
@@ -217,6 +233,9 @@ async function start() {
   console.log(Query.distanceGreaterThan("location", [40.7128, -74], 1000, true));
   console.log(Query.distanceLessThan("location", [40.7128, -74], 1000));
   console.log(Query.distanceLessThan("location", [40.7128, -74], 1000, true));
+  console.log(Query.vectorDot("embedding", [0.1, 0.2, 0.3]));
+  console.log(Query.vectorCosine("embedding", [0.1, 0.2, 0.3]));
+  console.log(Query.vectorEuclidean("embedding", [0.1, 0.2, 0.3]));
 
   // Spatial query tests
   console.log(Query.intersects("location", [40.7128, -74]));

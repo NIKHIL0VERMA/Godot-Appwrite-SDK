@@ -4,6 +4,7 @@ import Foundation
 import FoundationNetworking
 #endif
 import Appwrite
+import JSONCodable
 import AsyncHTTPClient
 import NIO
 
@@ -79,6 +80,17 @@ class Tests: XCTestCase {
         let result = try await general.redirect()
         print((result as! [String: Any])["result"] as! String)
 
+        for (id, plain) in [("", "0"), ("0", "")] {
+            do {
+                _ = try await general.validatePath(plain: plain, id: id)
+                XCTFail("Empty path parameter was accepted")
+            } catch let error as AppwriteError {
+                print(error.message)
+            }
+        }
+        print(try await general.validatePath(plain: "0", id: "0").result)
+        print(try await general.validatePath(plain: "0", id: nil).result)
+
         do {
             var file = InputFile.fromPath("\(FileManager.default.currentDirectoryPath)/../../../resources/file.png")
             mock = try await general.upload(x: "string", y: 123, z: ["string in array"], file: file, onProgress: nil)
@@ -97,7 +109,7 @@ class Tests: XCTestCase {
 
         do {
             var url = URL(fileURLWithPath: "\(FileManager.default.currentDirectoryPath)/../../../resources/file.png")
-            var buffer = ByteBuffer(data: try! Data(contentsOf: url))
+            var buffer = ByteBuffer(bytes: try! Data(contentsOf: url))
             var file = InputFile.fromBuffer(buffer, filename: "file.png", mimeType: "image/png")
             mock = try await general.upload(x: "string", y: 123, z: ["string in array"], file: file, onProgress: nil)
             print(mock.result)
@@ -107,13 +119,16 @@ class Tests: XCTestCase {
 
         do {
             var url = URL(fileURLWithPath: "\(FileManager.default.currentDirectoryPath)/../../../resources/large_file.mp4")
-            var buffer = ByteBuffer(data: try! Data(contentsOf: url))
+            var buffer = ByteBuffer(bytes: try! Data(contentsOf: url))
             var file = InputFile.fromBuffer(buffer, filename: "large_file.mp4", mimeType: "video/mp4")
             mock = try await general.upload(x: "string", y: 123, z: ["string in array"], file: file, onProgress: nil)
             print(mock.result)
         } catch {
             print(error.localizedDescription)
         }
+
+        var downloaded = try await general.download()
+        print(downloaded.readString(length: downloaded.readableBytes) ?? "")
 
         mock = try await general.xenum(mockType: .first)
         print(mock.result)
@@ -125,6 +140,12 @@ class Tests: XCTestCase {
         mock = try await general.createPlayers(players: [
             Player(id: "player1", name: "John Doe", score: 100),
             Player(id: "player2", name: "Jane Doe", score: 200)
+        ])
+        print(mock.result)
+
+        mock = try await general.createDocuments(documents: [
+            AnyCodable(["$id": "one", "title": "hello"]),
+            AnyCodable(["$id": "two", "title": "world"])
         ])
         print(mock.result)
 
@@ -211,6 +232,9 @@ class Tests: XCTestCase {
         print(Query.distanceGreaterThan("location", values: [40.7128, -74], distance: 1000, meters: true))
         print(Query.distanceLessThan("location", values: [40.7128, -74], distance: 1000))
         print(Query.distanceLessThan("location", values: [40.7128, -74], distance: 1000, meters: true))
+        print(Query.vectorDot("embedding", vector: [0.1, 0.2, 0.3]))
+        print(Query.vectorCosine("embedding", vector: [0.1, 0.2, 0.3]))
+        print(Query.vectorEuclidean("embedding", vector: [0.1, 0.2, 0.3]))
 
         // Spatial query tests
         print(Query.intersects("location", values: [40.7128, -74]))

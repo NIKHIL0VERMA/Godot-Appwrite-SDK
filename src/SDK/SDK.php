@@ -2,11 +2,34 @@
 
 namespace Appwrite\SDK;
 
+use UnexpectedValueException;
+use Utopia\OpenAPI\Model\AnySchema;
+use Utopia\OpenAPI\Model\ArraySchema;
+use Utopia\OpenAPI\Model\BooleanSchema;
+use Utopia\OpenAPI\Model\CompositeSchema;
 use MatthiasMullie\Minify\JS;
 use MatthiasMullie\Minify\CSS;
+use Appwrite\SDK\Extension\Appwrite;
 use Exception;
-use Appwrite\Spec\Spec;
 use Throwable;
+use Utopia\OpenAPI\Model\Composition;
+use Utopia\OpenAPI\Model\Discriminator;
+use Utopia\OpenAPI\Model\IntegerSchema;
+use Utopia\OpenAPI\Model\MediaType;
+use Utopia\OpenAPI\Model\NumberSchema;
+use Utopia\OpenAPI\Model\ObjectSchema;
+use Utopia\OpenAPI\Model\Operation;
+use Utopia\OpenAPI\Model\Parameter;
+use Utopia\OpenAPI\Model\ParameterLocation;
+use Utopia\OpenAPI\Model\ReferenceSchema;
+use Utopia\OpenAPI\Model\RequestBody;
+use Utopia\OpenAPI\Model\Response;
+use Utopia\OpenAPI\Model\Schema;
+use Utopia\OpenAPI\Model\SecurityScheme;
+use Utopia\OpenAPI\Model\SecuritySchemeType;
+use Utopia\OpenAPI\Model\StringSchema;
+use Utopia\OpenAPI\Model\Tag;
+use Utopia\OpenAPI\Specification;
 use Twig\Environment;
 use Twig\Error\LoaderError;
 use Twig\Error\RuntimeError;
@@ -20,6 +43,8 @@ use Twig_Error_Syntax;
 
 class SDK
 {
+    private const string MULTIPART_MEDIA_TYPE = 'multipart/form-data';
+
     protected ?Environment $twig = null;
 
     protected array $defaultHeaders = [];
@@ -64,11 +89,23 @@ class SDK
 
     protected ?array $filteredModelDataCache = null;
 
+    /** @var array<string, list<Operation>>|null */
+    protected ?array $operationsByServiceCache = null;
+
+    protected array $schemaNames = [];
+
+    protected array $requiredSchemas = [];
+
+    protected array $schemaEnumNames = [];
+
+    protected array $multipartSchemas = [];
+
     /**
      * SDK constructor.
      */
-    public function __construct(protected Language $language, protected Spec $spec)
+    public function __construct(protected Language $language, protected Specification $spec)
     {
+        $this->indexSchemas();
         $this->twig = new Environment(new FilesystemLoader(__DIR__ . '/../../templates'), [
             'debug' => true
         ]);
@@ -97,11 +134,15 @@ class SDK
         $this->twig->addFilter(new TwigFilter('caseCamel', fn(?string $value): string => $this->helperCamelCase($value)));
         $this->twig->addFilter(new TwigFilter('removeDash', fn($value): string|array => str_replace('-', '', $value)));
         $this->twig->addFilter(new TwigFilter('caseDash', fn($value) => str_replace([' ', '_'], '-', strtolower((string) preg_replace('/([a-zA-Z])(?=[A-Z])/', '$1-', (string) $value)))));
-        $this->twig->addFilter(new TwigFilter('caseKebab', fn($value) => strtolower((string) preg_replace('/(?<!^)([A-Z][a-z]|(?<=[a-z])[^a-z\s]|(?<=[A-Z])[0-9_])/', '-$1', (string) $value))));
+        $this->twig->addFilter(new TwigFilter('caseKebab', function ($value): string {
+            $value = preg_replace('/(?<!^)([A-Z][a-z]|(?<=[a-z])[^a-z\s_]|(?<=[A-Z])\d)/', '-$1', (string) $value);
+            $value = str_replace(['_', ' '], '-', strtolower((string) $value));
+            return trim((string) preg_replace('/-+/', '-', $value), '-');
+        }));
         $this->twig->addFilter(new TwigFilter('caseSlash', fn($value) => str_replace([' ', '_', '.'], '/', strtolower((string) preg_replace('/([a-zA-Z])(?=[A-Z])/', '$1/', (string) $value)))));
         $this->twig->addFilter(new TwigFilter('caseDot', fn($value) => str_replace([' ', '_'], '.', strtolower((string) preg_replace('/([a-zA-Z])(?=[A-Z])/', '$1.', (string) $value)))));
         $this->twig->addFilter(new TwigFilter('caseSnake', function ($value): string {
-            preg_match_all('!([A-Za-z][A-Z0-9]*(?=$|[A-Z][a-z0-9])|[A-Za-z][a-z0-9]+)!', $value, $matches);
+            preg_match_all('!([A-Za-z][A-Z0-9]*(?=$|[A-Z][a-z0-9])|[A-Za-z][a-z0-9]+)!', (string) $value, $matches);
             $ret = $matches[0];
             foreach ($ret as &$match) {
                 $match = $match === strtoupper($match)
@@ -112,10 +153,49 @@ class SDK
         }));
         $this->twig->addFilter(new TwigFilter('caseJson', fn($value) => (is_array($value)) ? json_encode($value) : $value, ['is_safe' => ['html']]));
         $this->twig->addFilter(new TwigFilter('caseArray', fn($value) => (is_array($value)) ? json_encode($value) : '[]', ['is_safe' => ['html']]));
-        $this->twig->addFilter(new TwigFilter('typeName', fn(array $value, array $spec = []): string => $this->language->getTypeName($value, $spec), ['is_safe' => ['html']]));
-        $this->twig->addFilter(new TwigFilter('getValidResponseModels', fn(array $value): array => $this->getValidResponseModels($value)));
-        $this->twig->addFilter(new TwigFilter('paramDefault', fn(array $value): string => $this->language->getParamDefault($value), ['is_safe' => ['html']]));
-        $this->twig->addFilter(new TwigFilter('paramExample', fn(array $value, string $lang = '', array $spec = []): string => $this->language->getParamExample($value, $lang, $spec), ['is_safe' => ['html']]));
+        $this->twig->addFilter(new TwigFilter('typeName', fn(Schema|Parameter $value, ?Specification $spec = null): string => $this->language->getTypeName($value, $spec ?? $this->spec), ['is_safe' => ['html']]));
+        $this->twig->addFilter(new TwigFilter('getValidResponseModels', fn(Operation $value): array => $this->getValidResponseModels($value)));
+        $this->twig->addFilter(new TwigFilter('paramDefault', fn(Schema|Parameter $value): string => $this->language->getParamDefault($value), ['is_safe' => ['html']]));
+        $this->twig->addFilter(new TwigFilter('paramExample', fn(Schema|Parameter $value): string => $this->language->isOpenStringEnum($value)
+            ? $this->language->getSuggestedEnumExample($value)
+            : $this->language->getParamExample($value), ['is_safe' => ['html']]));
+        $this->twig->addFilter(new TwigFilter('methodName', fn(Operation $operation): string => $this->methodName($operation)));
+        $this->twig->addFilter(new TwigFilter('methodType', fn(Operation $operation): string|false => $this->language->getMethodType($operation, $this->spec)));
+        $this->twig->addFilter(new TwigFilter('parameters', fn(Operation $operation, string $location = 'all'): array => $this->getOperationParameters($operation, $location)));
+        $this->twig->addFilter(new TwigFilter('responseModel', fn(Operation $operation): string => $this->getResponseModel($operation)));
+        $this->twig->addFilter(new TwigFilter('responseModels', fn(Operation $operation): array => $this->getValidResponseModels($operation)));
+        $this->twig->addFilter(new TwigFilter('schemaName', fn(Schema $schema): string => $this->getSchemaName($schema)));
+        $this->twig->addFilter(new TwigFilter('schemaType', fn(Schema|Parameter $value): string => $this->getSchemaType($value)));
+        $this->twig->addFilter(new TwigFilter('schemaModel', fn(Schema|Parameter $value): string => $this->getSchemaModel($value)));
+        $this->twig->addFilter(new TwigFilter('schemaModels', fn(Schema|Parameter $value): array => $this->getSchemaModels($value)));
+        $this->twig->addFilter(new TwigFilter('schemaRequired', fn(Schema|Parameter $value): bool => $value instanceof Parameter ? $value->required : isset($this->requiredSchemas[\spl_object_id($value)])));
+        $this->twig->addFilter(new TwigFilter('schemaExample', fn(Schema|Parameter $value): mixed => $this->getSchema($value)->example));
+        $this->twig->addFilter(new TwigFilter('schemaDefault', fn(Schema|Parameter $value): mixed => $this->getSchema($value)->default));
+        $this->twig->addFilter(new TwigFilter('enumName', fn(Schema|Parameter $value): string => $this->getEnumName($value)));
+        $this->twig->addFilter(new TwigFilter('enumKeys', fn(Schema|Parameter $value): array => $this->language->resolveEnumKeys($value)));
+        $this->twig->addFilter(new TwigFilter('operations', fn(Tag $tag): array => $this->getFilteredMethods($this->getMethods($tag->name), $tag->name)));
+        $this->twig->addFilter(new TwigFilter('consumes', fn(Operation $operation): array => \array_keys($operation->requestBody?->content ?? [])));
+        $this->twig->addFilter(new TwigFilter('uploadIdParameter', $this->uploadIdParameter(...)));
+        $this->twig->addFilter(new TwigFilter('produces', fn(Operation $operation): array => $this->getProduces($operation)));
+        $this->twig->addFilter(new TwigFilter('endpoint', fn(Specification $spec): string => $spec->servers[0]->url ?? 'https://example.com'));
+        $this->twig->addFilter(new TwigFilter('appwrite', fn(Operation|SecurityScheme $value, string $key, mixed $default = null): mixed => $value->extensions[Extension::APPWRITE->value][$key] ?? $default));
+        $this->twig->addFilter(new TwigFilter('extension', fn(Schema|Parameter $value, string $key, mixed $default = null): mixed => $this->getSchema($value)->extensions[$key] ?? $default));
+        $this->twig->addFilter(new TwigFilter('methodHeaders', fn(Operation $operation): array => $this->getMethodHeaders($operation)));
+        $this->twig->addFilter(new TwigFilter('responseDiscriminator', fn(Operation $operation): array => $this->getResponseDiscriminator($operation)));
+        $this->twig->addFilter(new TwigFilter('securitySchemes', fn(Operation $operation): array => $this->getOperationAuthSchemes($operation)));
+        $this->twig->addFilter(new TwigFilter('securityHeaders', fn(Operation $operation): array => $this->getOperationSecuritySchemes($operation, ParameterLocation::HEADER, false)));
+        $this->twig->addFilter(new TwigFilter('securityQueries', fn(Operation $operation): array => $this->getOperationSecuritySchemes($operation, ParameterLocation::QUERY)));
+        $this->twig->addFilter(new TwigFilter('schemaNullable', fn(Schema|Parameter $value): bool => !isset($this->multipartSchemas[\spl_object_id($this->getSchema($value))]) && $this->getSchema($value)->nullable));
+        $this->twig->addFilter(new TwigFilter('enumValues', fn(Schema|Parameter $value): array => $this->language->isOpenStringEnum($value) && !$this->language->keepsOpenEnumType()
+            ? []
+            : $this->language->getEnumSchema($value)->enum));
+        $this->twig->addFilter(new TwigFilter('enumSuggestions', fn(Schema|Parameter $value): array => $this->language->getEnumSchema($value)->enum));
+        $this->twig->addFilter(new TwigFilter('usesEnumType', fn(Schema|Parameter $value): bool => $this->language->usesEnumType($value)));
+        $this->twig->addFilter(new TwigFilter('openEnum', fn(Schema|Parameter $value): bool => $this->language->isOpenStringEnum($value)));
+        $this->twig->addFilter(new TwigFilter('arraySchema', fn(Schema|Parameter $value): ?Schema => ($schema = $this->getSchema($value)) instanceof ArraySchema ? $schema->items : null));
+        $this->twig->addFilter(new TwigFilter('emptyResponse', fn(Operation $operation): bool => \array_keys($operation->responses) === [204] || \array_keys($operation->responses) === ['204']));
+        $this->twig->addFilter(new TwigFilter('fullPath', fn(Operation $operation): string => (\parse_url($this->spec->servers[0]->url ?? '', PHP_URL_PATH) ?: '') . $operation->path));
+        $this->twig->addFilter(new TwigFilter('securityNames', fn(Operation $operation): array => \array_keys($this->getOperationSecuritySchemes($operation))));
         $this->twig->addFilter(new TwigFilter('wrap', function ($value, int $width = 75, string $prefix = ''): string {
             $lines = explode("\n", (string) $value);
             foreach ($lines as $key => $line) {
@@ -134,7 +214,7 @@ class SDK
 
             foreach ($value as $param) {
                 $query .= (empty($query)) ? "" : " + '&";
-                $query .= "{$param['name']}=' + {$param['name']}";
+                $query .= "{$param->name}=' + {$param->name}";
             }
 
             return $query;
@@ -150,7 +230,7 @@ class SDK
         $this->twig->addFilter(new TwigFilter('caseSnakeExceptFirstDot', function ($value): string {
             $parts = explode('.', $value, 2);
             $toSnake = function ($str): string {
-                preg_match_all('!([A-Za-z][A-Z0-9]*(?=$|[A-Z][a-z0-9])|[A-Za-z][a-z0-9]+)!', $str, $matches);
+                preg_match_all('!([A-Za-z][A-Z0-9]*(?=$|[A-Z][a-z0-9])|[A-Za-z][a-z0-9]+)!', (string) $str, $matches);
                 return implode('_', array_map(fn(string $m): string => $m === strtoupper($m) ? strtolower($m) : lcfirst($m), $matches[0]));
             };
             if (count($parts) < 2) {
@@ -199,6 +279,7 @@ class SDK
     public function setNamespace(string $namespace): SDK
     {
         $this->setParam('namespace', $namespace);
+        $this->language->setParam('namespace', $namespace);
 
         return $this;
     }
@@ -234,6 +315,9 @@ class SDK
     public function setPlatform(string $platform): SDK
     {
         $this->setParam('platform', $platform);
+        $this->operationsByServiceCache = null;
+        $this->filteredServicesCache = null;
+        $this->filteredModelDataCache = null;
 
         return $this;
     }
@@ -409,373 +493,495 @@ class SDK
         return $this->params;
     }
 
-    /**
-     * Get services filtered by exclusion rules
-     */
+    /** @return array<string, Tag> */
     protected function getFilteredServices(): array
     {
         if ($this->filteredServicesCache !== null) {
             return $this->filteredServicesCache;
         }
 
-        $allServices = $this->spec->getServices();
-        $filteredServices = [];
-
-        foreach ($allServices as $serviceName => $service) {
-            $allMethods = $this->spec->getMethods($serviceName);
-
-            if ($this->isServiceExcluded($serviceName, $allMethods)) {
-                continue;
-            }
-
-            $methods = $this->getFilteredMethods($allMethods, $serviceName);
-
-            if ($methods === []) {
-                continue;
-            }
-
-            $service['methods'] = $methods;
-            $filteredServices[$serviceName] = $service;
+        $services = [];
+        foreach (\array_keys($this->getOperationsByService()) as $name) {
+            $services[$name] = $this->spec->tags[$name] ?? new Tag($name);
         }
 
-        $this->filteredServicesCache = $filteredServices;
+        foreach (array_keys($services) as $name) {
+            $methods = $this->getFilteredMethods($this->getMethods($name), $name);
+            if ($methods === [] || $this->isServiceExcluded($name, $methods)) {
+                unset($services[$name]);
+            }
+        }
 
-        return $this->filteredServicesCache;
+        return $this->filteredServicesCache = $services;
     }
 
+    /** @return list<Operation> */
+    protected function getMethods(string $service): array
+    {
+        return $this->getOperationsByService()[$service] ?? [];
+    }
+
+    /**
+     * Expand generator-specific method aliases while keeping typed OpenAPI DTOs
+     * throughout the rendering pipeline.
+     *
+     * @return array<string, list<Operation>>
+     */
+    protected function getOperationsByService(): array
+    {
+        if ($this->operationsByServiceCache !== null) {
+            return $this->operationsByServiceCache;
+        }
+
+        $operations = [];
+        foreach ($this->spec->operations() as $operation) {
+            if (!$this->isAvailable($operation->extensions[Extension::APPWRITE->value][Appwrite::PLATFORMS->value] ?? null)) {
+                continue;
+            }
+
+            $operation = $this->annotateSecurityPathParameters($operation);
+            $aliases = $operation->extensions[Extension::APPWRITE->value][Appwrite::METHODS->value] ?? [];
+            if (!\is_array($aliases) || $aliases === []) {
+                foreach ($operation->tags as $serviceName) {
+                    $operations[$serviceName][] = $operation;
+                }
+                continue;
+            }
+
+            foreach ($aliases as $alias) {
+                if (!\is_array($alias) || !$this->isAvailable($alias['platforms'] ?? null)) {
+                    continue;
+                }
+
+                $targets = isset($alias['namespace'])
+                    ? [(string) $alias['namespace']]
+                    : $operation->tags;
+                foreach (\array_unique($targets) as $serviceName) {
+                    $operations[$serviceName][] = $this->createAliasedOperation($operation, $alias, $serviceName);
+                }
+            }
+        }
+
+        return $this->operationsByServiceCache = $operations;
+    }
+
+    /**
+     * Whether an `x-appwrite.platforms` list admits the platform this SDK is
+     * generated for. Operations, method aliases and security schemes carry
+     * one; a missing list means available everywhere, as does generating
+     * without a platform.
+     */
+    protected function isAvailable(mixed $platforms): bool
+    {
+        $platform = $this->getParam('platform');
+
+        return $platform === '' || !\is_array($platforms) || \in_array($platform, $platforms, true);
+    }
+
+    /** A security scheme by name, or null when unknown or not offered on this platform. */
+    protected function getSecurityScheme(string $name): ?SecurityScheme
+    {
+        $scheme = $this->spec->securitySchemes[$name] ?? null;
+
+        return $scheme instanceof SecurityScheme && $this->isAvailable($scheme->extensions[Extension::APPWRITE->value][Appwrite::PLATFORMS->value] ?? null) ? $scheme : null;
+    }
+
+    protected function annotateSecurityPathParameters(Operation $operation): Operation
+    {
+        $securityParameters = [];
+        foreach ($operation->acceptedSecuritySchemeNames() as $schemeName) {
+            $scheme = $this->getSecurityScheme($schemeName);
+            if (!$scheme instanceof SecurityScheme || ($scheme->extensions[Extension::APPWRITE->value][Appwrite::LOCATION->value] ?? '') !== 'path') {
+                continue;
+            }
+            $parameterName = (string) ($scheme->extensions[Extension::APPWRITE->value][Appwrite::PARAM->value] ?? $scheme->name ?? $schemeName);
+            $securityParameters[$parameterName] = (string) ($scheme->extensions[Extension::APPWRITE->value][Appwrite::CONFIG->value] ?? $scheme->name ?? $schemeName);
+        }
+        if ($securityParameters === []) {
+            return $operation;
+        }
+
+        $parameters = [];
+        foreach ($operation->parameters as $parameter) {
+            $config = $securityParameters[$parameter->name] ?? null;
+            if ($config === null || $parameter->location !== ParameterLocation::PATH) {
+                $parameters[] = $parameter;
+                continue;
+            }
+            $parameters[] = new Parameter(
+                name: $parameter->name,
+                location: $parameter->location,
+                description: $parameter->description,
+                required: $parameter->required,
+                deprecated: $parameter->deprecated,
+                allowEmptyValue: $parameter->allowEmptyValue,
+                schema: $parameter->schema,
+                content: $parameter->content,
+                style: $parameter->style,
+                explode: $parameter->explode,
+                allowReserved: $parameter->allowReserved,
+                extensions: [
+                    ...$parameter->extensions,
+                    Extension::SDK_SOURCE->value => 'security',
+                    Extension::SDK_CONFIG->value => $config,
+                ],
+            );
+        }
+
+        return new Operation(
+            id: $operation->id,
+            method: $operation->method,
+            path: $operation->path,
+            tags: $operation->tags,
+            summary: $operation->summary,
+            description: $operation->description,
+            deprecated: $operation->deprecated,
+            parameters: $parameters,
+            requestBody: $operation->requestBody,
+            responses: $operation->responses,
+            security: $operation->security,
+            servers: $operation->servers,
+            externalDocumentation: $operation->externalDocumentation,
+            extensions: $operation->extensions,
+        );
+    }
+
+    /** @param array<string, mixed> $alias */
+    protected function createAliasedOperation(Operation $operation, array $alias, string $serviceName): Operation
+    {
+        $methodName = (string) ($alias['name'] ?? $this->methodName($operation));
+        $appwrite = $operation->extensions[Extension::APPWRITE->value] ?? [];
+        $appwrite['auth'] = $alias['auth'] ?? [];
+        if (isset($alias['deprecated'])) {
+            $appwrite['deprecated'] = $alias['deprecated'];
+        } else {
+            unset($appwrite['deprecated']);
+        }
+
+        $extensions = $operation->extensions;
+        $extensions[Extension::APPWRITE->value] = $appwrite;
+
+        return new Operation(
+            id: $serviceName . \ucfirst($methodName),
+            method: $operation->method,
+            path: $operation->path,
+            tags: [$serviceName],
+            summary: (string) ($alias['name'] ?? $operation->summary),
+            description: (string) (($alias['description'] ?? '') !== '' ? $alias['description'] : $operation->description),
+            deprecated: isset($alias['deprecated']),
+            parameters: $operation->parameters,
+            requestBody: $this->createAliasedRequestBody($operation->requestBody, $alias),
+            responses: $this->createAliasedResponses($operation, $alias),
+            security: $operation->security,
+            servers: $operation->servers,
+            externalDocumentation: $operation->externalDocumentation,
+            extensions: $extensions,
+        );
+    }
+
+    /** @param array<string, mixed> $alias */
+    protected function createAliasedRequestBody(?RequestBody $requestBody, array $alias): ?RequestBody
+    {
+        if (!$requestBody instanceof RequestBody || empty($alias['parameters']) || !\is_array($alias['parameters'])) {
+            return $requestBody;
+        }
+
+        $content = [];
+        foreach ($requestBody->content as $contentType => $mediaType) {
+            $schema = $mediaType->schema;
+            if ($schema instanceof ObjectSchema) {
+                $properties = \array_intersect_key($schema->properties, \array_flip($alias['parameters']));
+                $schema = new ObjectSchema(
+                    properties: $properties,
+                    required: \array_values(\array_intersect($alias['required'] ?? [], \array_keys($properties))),
+                    additionalProperties: $schema->additionalProperties,
+                    minProperties: $schema->minProperties,
+                    maxProperties: $schema->maxProperties,
+                    title: $schema->title,
+                    description: $schema->description,
+                    nullable: $schema->nullable,
+                    default: $schema->default,
+                    enum: $schema->enum,
+                    format: $schema->format,
+                    readOnly: $schema->readOnly,
+                    writeOnly: $schema->writeOnly,
+                    deprecated: $schema->deprecated,
+                    example: $schema->example,
+                    extensions: $schema->extensions,
+                );
+            }
+            $content[$contentType] = new MediaType(
+                schema: $schema,
+                example: $mediaType->example,
+                examples: $mediaType->examples,
+                encoding: $mediaType->encoding,
+                extensions: $mediaType->extensions,
+            );
+        }
+
+        return new RequestBody(
+            description: $requestBody->description,
+            required: $requestBody->required,
+            content: $content,
+            extensions: $requestBody->extensions,
+        );
+    }
+
+    /** @param array<string, mixed> $alias @return array<string, Response> */
+    protected function createAliasedResponses(Operation $operation, array $alias): array
+    {
+        if (!isset($alias['responses']) || !\is_array($alias['responses'])) {
+            return $operation->responses;
+        }
+
+        $contentType = '';
+        foreach ($operation->responses as $response) {
+            $contentType = (string) (\array_key_first($response->content) ?? '');
+            if ($contentType !== '') {
+                break;
+            }
+        }
+
+        $responses = [];
+        foreach ($alias['responses'] as $descriptor) {
+            if (!\is_array($descriptor) || !isset($descriptor['code'])) {
+                continue;
+            }
+            if (!isset($descriptor['model'])) {
+                $responses[(string) $descriptor['code']] = new Response(description: '');
+                continue;
+            }
+
+            $models = \is_array($descriptor['model']) ? $descriptor['model'] : [$descriptor['model']];
+            $schemas = \array_map(
+                static fn(string $reference): ReferenceSchema => new ReferenceSchema($reference),
+                $models,
+            );
+            $schema = \count($schemas) === 1
+                ? $schemas[0]
+                : new CompositeSchema(Composition::ONE_OF, $schemas);
+            $responses[(string) $descriptor['code']] = new Response(
+                description: '',
+                content: [$contentType => new MediaType(schema: $schema)],
+            );
+        }
+
+        return $responses;
+    }
+
+    /** @param list<Operation> $methods @return list<Operation> */
     protected function getFilteredMethods(array $methods, string $serviceName = ''): array
     {
         return \array_values(\array_filter(
             $methods,
-            function (array $method) use ($serviceName): bool {
-                $method['service'] = $serviceName;
-
-                return !$this->isClientMethod($method) && !$this->isMethodExcluded($method, $serviceName);
-            }
+            fn(Operation $method): bool => !$this->isClientMethod($method, $serviceName)
+            && !$this->isMethodExcluded($method, $serviceName),
         ));
     }
 
-    protected function isClientMethod(array $method): bool
+    protected function isClientMethod(Operation $method, string $service): bool
     {
-        return match (($method['service'] ?? '') . '.' . ($method['name'] ?? '')) {
-            'ping.get' => true,
-            default => false,
-        };
+        return $service === 'ping' && $this->methodName($method) === 'get';
     }
 
+    /** @return array<string, array<string, Operation>> */
     protected function getClientMethods(): array
     {
         $clientMethods = [];
-
-        foreach (array_keys($this->spec->getServices()) as $serviceName) {
-            foreach ($this->spec->getMethods($serviceName) as $method) {
-                $method['service'] = $serviceName;
-
-                if (!$this->isClientMethod($method)) {
-                    continue;
+        foreach ($this->spec->operations() as $method) {
+            if (!$this->isAvailable($method->extensions[Extension::APPWRITE->value][Appwrite::PLATFORMS->value] ?? null)) {
+                continue;
+            }
+            foreach ($method->tags as $serviceName) {
+                if ($this->isClientMethod($method, $serviceName)) {
+                    $clientMethods[$serviceName][$this->methodName($method)] = $method;
                 }
-
-                $clientMethods[$serviceName][$method['name']] = $method;
             }
         }
-
         return $clientMethods;
     }
 
+    /** @return array<string, Schema> */
     protected function getFilteredDefinitions(): array
     {
         return $this->getFilteredModelData()['definitions'];
     }
 
+    /** @return array<string, Schema> */
     protected function getFilteredRequestModels(): array
     {
         return $this->getFilteredModelData()['requestModels'];
     }
 
+    /** @return list<StringSchema> */
     protected function getFilteredRequestEnums(?array $filteredServices = null): array
     {
-        $filteredServices ??= $this->getFilteredServices();
-        $list = [];
-
-        foreach ($filteredServices as $service) {
-            foreach ($service['methods'] ?? [] as $method) {
-                foreach ($method['parameters']['all'] ?? [] as $parameter) {
-                    $enumName = $parameter['enumName'] ?? $parameter['name'] ?? '';
-
-                    if (!isset($parameter['enumValues']) || empty($enumName)) {
-                        continue;
+        $schemas = [];
+        foreach ((array_keys($filteredServices ?? $this->getFilteredServices())) as $serviceName) {
+            foreach ($this->getFilteredMethods($this->getMethods($serviceName), $serviceName) as $operation) {
+                foreach ($this->getOperationParameters($operation) as $parameter) {
+                    $enumSchema = $this->language->getEnumSchema($parameter);
+                    if ($enumSchema->enum !== []) {
+                        $schemas[] = new StringSchema(
+                            title: $this->getEnumName($parameter),
+                            enum: $enumSchema->enum,
+                            enumKeys: $this->language->resolveEnumKeys($parameter),
+                            open: $this->language->isOpenStringEnum($parameter),
+                        );
                     }
-
-                    $this->mergeEnumValues(
-                        $list,
-                        $enumName,
-                        $parameter['enumValues'],
-                        $parameter['enumKeys'] ?? []
-                    );
                 }
             }
         }
-
-        return \array_values($list);
+        return $this->mergeEnums($schemas);
     }
 
+    /** @return list<StringSchema> */
     protected function getFilteredResponseEnums(?array $filteredDefinitions = null): array
     {
-        $filteredDefinitions ??= $this->getFilteredDefinitions();
-        $list = [];
-
-        foreach ($filteredDefinitions as $modelName => $model) {
-            foreach ($model['properties'] ?? [] as $propertyName => $property) {
-                if (isset($property['enum'])) {
-                    $enumName = $property['enumName'] ?? ucfirst((string) $modelName) . ucfirst((string) $propertyName);
-
-                    $this->mergeEnumValues(
-                        $list,
-                        $enumName,
-                        $property['enum'],
-                        $property['enumKeys'] ?? []
-                    );
-                }
-
-                if ((($property['type'] ?? null) === 'array') && isset($property['items']['enum'])) {
-                    $enumName = $property['items']['x-enum-name']
-                        ?? $property['enumName']
-                        ?? ucfirst((string) $modelName) . ucfirst((string) $propertyName);
-
-                    $this->mergeEnumValues(
-                        $list,
-                        $enumName,
-                        $property['items']['enum'],
-                        $property['items']['x-enum-keys'] ?? []
-                    );
-                }
-            }
-        }
-
-        return \array_values($list);
+        return $this->modelEnums($filteredDefinitions ?? $this->getFilteredDefinitions());
     }
 
+    /** @return list<StringSchema> */
     protected function getFilteredRequestModelEnums(?array $filteredRequestModels = null): array
     {
-        $filteredRequestModels ??= $this->getFilteredRequestModels();
-        $list = [];
-
-        foreach ($filteredRequestModels as $modelName => $model) {
-            foreach ($model['properties'] ?? [] as $propertyName => $property) {
-                if (isset($property['enum'])) {
-                    $enumName = $property['enumName'] ?? ucfirst((string) $modelName) . ucfirst((string) $propertyName);
-
-                    $this->mergeEnumValues(
-                        $list,
-                        $enumName,
-                        $property['enum'],
-                        $property['enumKeys'] ?? []
-                    );
-                }
-
-                if ((($property['type'] ?? null) === 'array') && isset($property['enumValues'])) {
-                    $enumName = $property['enumName'] ?? ucfirst((string) $modelName) . ucfirst((string) $propertyName);
-
-                    $this->mergeEnumValues(
-                        $list,
-                        $enumName,
-                        $property['enumValues'],
-                        $property['enumKeys'] ?? []
-                    );
-                }
-            }
-        }
-
-        return \array_values($list);
+        return $this->modelEnums($filteredRequestModels ?? $this->getFilteredRequestModels());
     }
 
+    /** @return list<StringSchema> */
     protected function getFilteredAllEnums(
         ?array $filteredRequestEnums = null,
         ?array $filteredRequestModelEnums = null,
-        ?array $filteredResponseEnums = null
+        ?array $filteredResponseEnums = null,
     ): array {
-        $filteredRequestEnums ??= $this->getFilteredRequestEnums();
-        $filteredRequestModelEnums ??= $this->getFilteredRequestModelEnums();
-        $filteredResponseEnums ??= $this->getFilteredResponseEnums();
-        $list = [];
-
-        foreach ($filteredRequestEnums as $enum) {
-            $this->mergeEnumValues(
-                $list,
-                $enum['name'],
-                $enum['enum'],
-                $enum['keys'] ?? []
-            );
-        }
-
-        foreach ($filteredRequestModelEnums as $enum) {
-            $this->mergeEnumValues(
-                $list,
-                $enum['name'],
-                $enum['enum'],
-                $enum['keys'] ?? []
-            );
-        }
-
-        foreach ($filteredResponseEnums as $enum) {
-            $this->mergeEnumValues(
-                $list,
-                $enum['name'],
-                $enum['enum'],
-                $enum['keys'] ?? []
-            );
-        }
-
-        return \array_values($list);
+        return $this->mergeEnums([
+            ...($filteredRequestEnums ?? $this->getFilteredRequestEnums()),
+            ...($filteredRequestModelEnums ?? $this->getFilteredRequestModelEnums()),
+            ...($filteredResponseEnums ?? $this->getFilteredResponseEnums()),
+        ]);
     }
 
-    protected function mergeEnumValues(array &$list, string $enumName, array $enumValues, array $enumKeys = []): void
+    /** @param array<string, Schema> $models @return list<Schema> */
+    protected function modelEnums(array $models): array
     {
-        if (!isset($list[$enumName])) {
-            $list[$enumName] = [
-                'name' => $enumName,
-                'enum' => [],
-                'keys' => [],
-            ];
-        }
-
-        foreach ($enumValues as $index => $value) {
-            if (\in_array($value, $list[$enumName]['enum'], true)) {
+        $enums = [];
+        foreach ($models as $model) {
+            if (!$model instanceof ObjectSchema) {
                 continue;
             }
-
-            $key = $enumKeys[$index] ?? $value;
-            $normalizedKey = \strtoupper((string) \preg_replace('/[^a-zA-Z0-9]/', '', (string) $key));
-            $existingKeys = \array_map(
-                fn($existingKey) => \strtoupper((string) \preg_replace('/[^a-zA-Z0-9]/', '', (string) $existingKey)),
-                $list[$enumName]['keys']
-            );
-
-            if (\in_array($normalizedKey, $existingKeys, true)) {
-                continue;
+            foreach ($model->properties as $property) {
+                $enumSchema = $this->language->getEnumSchema($property);
+                if ($enumSchema->enum !== []) {
+                    $enums[] = new StringSchema(
+                        title: $this->getEnumName($property),
+                        enum: $enumSchema->enum,
+                        enumKeys: $this->language->resolveEnumKeys($property),
+                        open: $this->language->isOpenStringEnum($property),
+                    );
+                }
             }
-
-            $list[$enumName]['enum'][] = $value;
-            $list[$enumName]['keys'][] = $key;
         }
+        return $this->mergeEnums($enums);
     }
 
+    /** @param list<Schema> $schemas @return list<StringSchema> */
+    protected function mergeEnums(array $schemas): array
+    {
+        $values = [];
+        $keys = [];
+        $open = [];
+        foreach ($schemas as $schema) {
+            $name = $this->getEnumName($schema);
+            if ($name === '') {
+                continue;
+            }
+            $open[$name] = ($open[$name] ?? true) && $this->language->isOpenStringEnum($schema);
+            foreach ($schema->enum as $index => $value) {
+                if (!\in_array($value, $values[$name] ?? [], true)) {
+                    $values[$name][] = $value;
+                    $keys[$name][] = $schema instanceof StringSchema ? ($schema->enumKeys[$index] ?? $value) : $value;
+                }
+            }
+        }
+
+        $enums = [];
+        foreach ($values as $name => $enumValues) {
+            $merged = new StringSchema(
+                title: $name,
+                enum: $enumValues,
+                enumKeys: $keys[$name],
+                open: $open[$name],
+            );
+            $enums[] = new StringSchema(
+                title: $name,
+                enum: $enumValues,
+                enumKeys: $this->language->resolveEnumKeys($merged),
+                open: $open[$name],
+            );
+        }
+        return $enums;
+    }
+
+    /** @return array{definitions: array<string, Schema>, requestModels: array<string, Schema>} */
     protected function getFilteredModelData(): array
     {
         if ($this->filteredModelDataCache !== null) {
             return $this->filteredModelDataCache;
         }
 
-        $definitions = $this->spec->getDefinitions();
-        $requestModels = $this->spec->getRequestModels();
-        $excludedDefinitions = $this->getExcludedDefinitions();
+        $excluded = $this->getExcludedDefinitions();
         $queue = [];
-        $reachableDefinitions = [];
-        $reachableRequestModels = [];
-
-        foreach ($this->getFilteredServices() as $service) {
-            foreach ($service['methods'] ?? [] as $method) {
-                $responseModels = $method['responseModels'] ?? [];
-
-                if (!empty($method['responseModel'])) {
-                    $responseModels[] = $method['responseModel'];
+        foreach (array_keys($this->getFilteredServices()) as $serviceName) {
+            foreach ($this->getFilteredMethods($this->getMethods($serviceName), $serviceName) as $operation) {
+                foreach ($this->getValidResponseModels($operation) as $modelName) {
+                    $queue[$modelName] = true;
                 }
-
-                foreach ($responseModels as $modelName) {
-                    if (!empty($modelName)) {
+                foreach ($this->getOperationParameters($operation) as $parameter) {
+                    foreach ($this->getSchemaDependencyNames($parameter) as $modelName) {
                         $queue[$modelName] = true;
                     }
                 }
-
-                foreach ($method['parameters']['all'] ?? [] as $parameter) {
-                    $parameterModels = [
-                        $parameter['model'] ?? null,
-                        $parameter['array']['model'] ?? null,
-                    ];
-
-                    foreach ($parameterModels as $modelName) {
-                        if (!empty($modelName)) {
-                            $queue[$modelName] = true;
-                        }
-                    }
-                }
             }
         }
 
+        $reachable = [];
         while ($queue !== []) {
-            $modelName = array_key_first($queue);
+            $name = array_key_first($queue);
+            unset($queue[$name]);
 
-            if ($modelName === null) {
-                break;
-            }
-
-            unset($queue[$modelName]);
-
-            if (isset($excludedDefinitions[$modelName])) {
+            if ($name === 'any' || isset($excluded[$name]) || isset($reachable[$name])) {
                 continue;
             }
 
-            $model = $definitions[$modelName] ?? $requestModels[$modelName] ?? null;
-
-            if ($model === null) {
+            $schema = $this->spec->schemas[$name] ?? null;
+            if ($schema === null) {
                 continue;
             }
 
-            if (isset($definitions[$modelName])) {
-                if (isset($reachableDefinitions[$modelName])) {
-                    continue;
+            $reachable[$name] = true;
+            foreach ($this->getSchemaDependencies($schema) as $dependency) {
+                if (!isset($excluded[$dependency])) {
+                    $queue[$dependency] = true;
                 }
+            }
+        }
 
-                $reachableDefinitions[$modelName] = true;
+        $definitions = [];
+        $requestModels = [];
+        foreach ($this->spec->schemas as $name => $schema) {
+            if (!isset($reachable[$name])) {
+                continue;
+            }
+            if ($schema->extensions[Extension::REQUEST_MODEL->value] ?? false) {
+                $requestModels[$name] = $schema;
             } else {
-                if (isset($reachableRequestModels[$modelName])) {
-                    continue;
-                }
-
-                $reachableRequestModels[$modelName] = true;
-            }
-
-            foreach ($model['properties'] ?? [] as $property) {
-                $dependencies = [];
-
-                if (!empty($property['sub_schema'])) {
-                    $dependencies[] = $property['sub_schema'];
-                }
-
-                foreach ($property['sub_schemas'] ?? [] as $subSchema) {
-                    if (!empty($subSchema)) {
-                        $dependencies[] = $subSchema;
-                    }
-                }
-
-                foreach ($dependencies as $dependency) {
-                    if (!isset($excludedDefinitions[$dependency])) {
-                        $queue[$dependency] = true;
-                    }
-                }
+                $definitions[$name] = $schema;
             }
         }
 
-        $filteredDefinitions = [];
-        foreach ($definitions as $modelName => $definition) {
-            if (isset($reachableDefinitions[$modelName])) {
-                $filteredDefinitions[$modelName] = $definition;
-            }
-        }
-
-        $filteredRequestModels = [];
-        foreach ($requestModels as $modelName => $requestModel) {
-            if (isset($reachableRequestModels[$modelName])) {
-                $filteredRequestModels[$modelName] = $requestModel;
-            }
-        }
-
-        $this->filteredModelDataCache = [
-            'definitions' => $filteredDefinitions,
-            'requestModels' => $filteredRequestModels,
+        return $this->filteredModelDataCache = [
+            'definitions' => $definitions,
+            'requestModels' => $requestModels,
         ];
-
-        return $this->filteredModelDataCache;
     }
 
     /**
@@ -800,36 +1006,22 @@ class SDK
         );
 
         $params = [
-            'spec' => [
-                'title' => $this->spec->getTitle(),
-                'description' => $this->spec->getDescription(),
-                'namespace' => $this->getParam('namespace') ?: $this->spec->getNamespace(),
-                'version' => $this->spec->getVersion(),
-                'endpoint' => $this->spec->getEndpoint(),
-                'endpointDocs' => $this->spec->getEndpointDocs(),
-                'host' => parse_url($this->spec->getEndpoint(), PHP_URL_HOST),
-                'basePath' => parse_url($this->spec->getEndpoint(), PHP_URL_PATH) ?: '',
-                'licenseName' => $this->spec->getLicenseName(),
-                'licenseURL' => $this->spec->getLicenseURL(),
-                'contactName' => $this->spec->getContactName(),
-                'contactURL' => $this->spec->getContactURL(),
-                'contactEmail' => $this->spec->getContactEmail(),
-                'services' => $filteredServices,
-                'clientMethods' => $this->getClientMethods(),
-                'requestEnums' => $filteredRequestEnums,
-                'requestModelEnums' => $filteredRequestModelEnums,
-                'responseEnums' => $filteredResponseEnums,
-                'allEnums' => $filteredAllEnums,
-                'definitions' => $filteredDefinitions,
-                'requestModels' => $filteredRequestModels,
-                'global' => [
-                    'headers' => $this->spec->getGlobalHeaders(),
-                    'defaultHeaders' => array_merge(
-                        $this->defaultHeaders,
-                        $this->spec->getVersion() !== '' ? ['X-Appwrite-Response-Format' => $this->spec->getVersion()] : [],
-                    ),
-                ],
-            ],
+            'spec' => $this->spec,
+            'services' => $filteredServices,
+            'clientMethods' => $this->getClientMethods(),
+            'requestEnums' => $filteredRequestEnums,
+            'requestModelEnums' => $filteredRequestModelEnums,
+            'responseEnums' => $filteredResponseEnums,
+            'allEnums' => $filteredAllEnums,
+            'definitions' => $filteredDefinitions,
+            'requestModels' => $filteredRequestModels,
+            'globalHeaders' => $this->getGlobalHeaders(),
+            'defaultHeaders' => array_merge(
+                $this->defaultHeaders,
+                $this->spec->info->version !== '' ? ['X-Appwrite-Response-Format' => $this->spec->info->version] : [],
+            ),
+            'namespace' => $this->getParam('namespace') ?: $this->spec->info->title,
+            'endpointDocs' => $this->getEndpointDocs(),
             'language' => [
                 'name' => $this->language->getName(),
                 'params' => $this->language->getParams(),
@@ -864,19 +1056,17 @@ class SDK
                     break;
                 case 'service':
                     foreach ($filteredServices as $key => $service) {
-                        $methods = $service['methods'] ?? [];
-                        $params['service'] = [
-                            'globalParams' => $service['globalParams'] ?? [],
-                            'description' => $service['description'] ?? '',
-                            'name' => $key,
-                            'features' => [
-                                'upload' => $this->hasUploads($methods),
-                                'location' => $this->hasLocation($methods),
-                                'webAuth' => $this->hasWebAuth($methods),
-                            ],
-                            'methods' => $methods,
-                            'isConsoleOnly' => $this->isConsoleOnly($key),
+                        $methods = $this->getFilteredMethods($this->getMethods($key), $key);
+                        $params['service'] = $service;
+                        $params['methods'] = $methods;
+                        $params['serviceFeatures'] = [
+                            'upload' => $this->hasUploads($methods),
+                            'location' => $this->hasLocation($methods),
+                            'webAuth' => $this->hasWebAuth($methods),
                         ];
+                        $params['isConsoleOnly'] = $this->isConsoleOnly($key);
+                        $params['consoleOnlyMethods'] = $this->isConsoleOnly($key) ? [] : $this->getConsoleOnlyMethods($key);
+                        $params['resourceHeader'] = $this->resourceHeaderScheme($key, $methods);
 
                         if ($this->exclude($file, $params)) {
                             continue;
@@ -886,8 +1076,9 @@ class SDK
                     }
                     break;
                 case 'definition':
-                    foreach ($filteredDefinitions as $definition) {
+                    foreach ($filteredDefinitions as $definitionName => $definition) {
                         $params['definition'] = $definition;
+                        $params['definitionName'] = $definitionName;
 
                         if ($this->exclude($file, $params)) {
                             continue;
@@ -897,8 +1088,9 @@ class SDK
                     }
                     break;
                 case 'requestModel':
-                    foreach ($filteredRequestModels as $requestModel) {
+                    foreach ($filteredRequestModels as $requestModelName => $requestModel) {
                         $params['requestModel'] = $requestModel;
+                        $params['requestModelName'] = $requestModelName;
 
                         if ($this->exclude($file, $params)) {
                             continue;
@@ -909,18 +1101,15 @@ class SDK
                     break;
                 case 'method':
                     foreach ($filteredServices as $key => $service) {
-                        $methods = $service['methods'] ?? [];
-                        $params['service'] = [
-                            'name' => $key,
-                            'methods' => $methods,
-                            'globalParams' => $service['globalParams'] ?? [],
-                            'features' => [
-                                'upload' => $this->hasUploads($methods),
-                                'location' => $this->hasLocation($methods),
-                                'webAuth' => $this->hasWebAuth($methods),
-                            ],
-                            'isConsoleOnly' => $this->isConsoleOnly($key),
+                        $methods = $this->getFilteredMethods($this->getMethods($key), $key);
+                        $params['service'] = $service;
+                        $params['methods'] = $methods;
+                        $params['serviceFeatures'] = [
+                            'upload' => $this->hasUploads($methods),
+                            'location' => $this->hasLocation($methods),
+                            'webAuth' => $this->hasWebAuth($methods),
                         ];
+                        $params['isConsoleOnly'] = $this->isConsoleOnly($key);
 
                         foreach ($methods as $method) {
                             $params['method'] = $method;
@@ -994,10 +1183,10 @@ class SDK
         return false;
     }
 
-    protected function isMethodExcluded(array $method, string $serviceName = ''): bool
+    protected function isMethodExcluded(Operation $method, string $serviceName = ''): bool
     {
         $excludeIndex = $this->getExcludeIndex();
-        $methodName = $method['name'] ?? '';
+        $methodName = $this->methodName($method);
 
         if (isset($excludeIndex['methods'][$methodName])) {
             foreach ($excludeIndex['methods'][$methodName] as $scope) {
@@ -1008,7 +1197,7 @@ class SDK
             }
         }
 
-        return isset($excludeIndex['types'][$method['type'] ?? '']);
+        return isset($excludeIndex['types'][$this->language->getMethodType($method, $this->spec) ?: '']);
     }
 
     protected function getExcludedDefinitions(): array
@@ -1110,60 +1299,118 @@ class SDK
             }
         }
 
-        if (\in_array($params['service']['name'] ?? '', $services)) {
+        $serviceName = ($params['service'] ?? null) instanceof Tag ? $params['service']->name : '';
+        if (\in_array($serviceName, $services, true)) {
             return true;
         }
 
         foreach ($features as $feature) {
-            if ($params['service']['features'][$feature] ?? false) {
+            if ($params['serviceFeatures'][$feature] ?? false) {
                 return true;
             }
         }
 
-        if (\in_array($params['method']['name'] ?? '', $methods)) {
+        $operation = $params['method'] ?? null;
+        $currentMethodName = $operation instanceof Operation ? $this->methodName($operation) : '';
+        if (\in_array($currentMethodName, $methods, true)) {
             return true;
         }
 
-        $currentMethodName = $params['method']['name'] ?? '';
-        $currentServiceName = $params['service']['name'] ?? '';
+        $currentServiceName = $serviceName;
         foreach ($scopedMethods as $scopedMethod) {
             if ($scopedMethod['name'] === $currentMethodName && $scopedMethod['service'] === $currentServiceName) {
                 return true;
             }
         }
 
-        if (\in_array($params['method']['type'] ?? '', $types)) {
+        if ($operation instanceof Operation && \in_array($this->language->getMethodType($operation, $this->spec), $types, true)) {
             return true;
         }
-        return \in_array($params['definition']['name'] ?? '', $definitions);
+        return \in_array($params['definitionName'] ?? '', $definitions, true);
     }
 
     protected function hasUploads(array $methods): bool
     {
-        return array_any($methods, fn($method): bool => isset($method['type']) && $method['type'] === 'upload');
+        return array_any($methods, fn(Operation $method): bool => $this->language->getMethodType($method, $this->spec) === 'upload');
     }
 
     protected function hasLocation(array $methods): bool
     {
-        return array_any($methods, fn($method): bool => isset($method['type']) && $method['type'] === 'location');
+        return array_any($methods, fn(Operation $method): bool => $this->language->getMethodType($method, $this->spec) === 'location');
     }
 
     protected function hasWebAuth(array $methods): bool
     {
-        return array_any($methods, fn($method): bool => isset($method['type']) && $method['type'] === 'webAuth');
+        return array_any($methods, fn(Operation $method): bool => $this->language->getMethodType($method, $this->spec) === 'webAuth');
     }
 
     protected function isConsoleOnly(string $serviceName): bool
     {
         $consoleOnlyServices = [
             'account',
+            'console',
+            'domains',
             'locale',
+            'manager',
+            'notifications',
             'organization',
             'organizations',
             'projects',
         ];
 
         return \in_array($serviceName, $consoleOnlyServices, true);
+    }
+
+    /**
+     * Methods on an otherwise project-scoped service that the API only serves on
+     * the console project. The `oauth2` discovery endpoints reject any other
+     * project, while the rest of the service stays bound to the caller's project.
+     *
+     * @return array<string>
+     */
+    protected function getConsoleOnlyMethods(string $serviceName): array
+    {
+        return match ($serviceName) {
+            'oauth2' => ['listOrganizations', 'listProjects'],
+            default => [],
+        };
+    }
+
+    /**
+     * The security scheme naming a service's own resource, or null when the
+     * service takes its target in the path like everything else.
+     *
+     * `/project` and `/organization` carry no ID: they act on whatever
+     * `X-Appwrite-Project` or `X-Appwrite-Organization` names, and without that
+     * header the API resolves an empty resource and answers 404. The spec says
+     * which those are — a header security scheme named after the service, and
+     * declared on that service's own methods:
+     *
+     *   project      -> Project        declared on its methods  => scoped
+     *   organization -> Organization   declared on its methods  => scoped
+     *   locale       -> Locale         NOT declared on them     => not scoped
+     *   projects     -> no such scheme                          => not scoped
+     *
+     * The `Locale` case is why the scheme has to appear in the method security
+     * and not merely exist: every service would otherwise match on name alone.
+     */
+    protected function resourceHeaderScheme(string $serviceName, array $methods): ?string
+    {
+        foreach (array_keys($this->getGlobalHeaders()) as $key) {
+            if (\strtolower($key) !== \strtolower($serviceName)) {
+                continue;
+            }
+
+            foreach ($methods as $method) {
+                foreach ($method->security as $requirement) {
+                    if (isset($requirement->schemes[$key])) {
+                        return $key;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -1244,29 +1491,494 @@ class SDK
         return lcfirst($str);
     }
 
-    /**
-     * @return array<int, string>
-     */
-    protected function getValidResponseModels(array $method): array
+    /** @return list<string> */
+    protected function getValidResponseModels(Operation $method): array
     {
-        $responseModels = [];
+        return \array_values(\array_filter(
+            $this->getResponseModels($method),
+            static fn(string $name): bool => $name !== 'any'
+        ));
+    }
 
-        foreach ($method['responseModels'] ?? [] as $modelName) {
-            if (empty($modelName) || $modelName === 'any' || \in_array($modelName, $responseModels, true)) {
+    /**
+     * Every model a response can resolve to, including the catch-all `any`.
+     *
+     * `getValidResponseModels()` drops `any` because a union of one real model
+     * plus `any` is not a union. `getResponseModel()` must keep it, so that an
+     * `any` response still names a type in the generated code rather than
+     * rendering as an empty string.
+     *
+     * @return list<string>
+     */
+    protected function getResponseModels(Operation $method): array
+    {
+        $models = [];
+        foreach ($method->responses as $response) {
+            foreach ($response->content as $mediaType) {
+                if ($mediaType->schema !== null) {
+                    \array_push($models, ...$this->getSchemaModels($mediaType->schema));
+                }
+            }
+        }
+        return \array_values(\array_unique($models));
+    }
+
+    protected function getResponseModel(Operation $operation): string
+    {
+        return $this->getResponseModels($operation)[0] ?? '';
+    }
+
+    protected function methodName(Operation $operation): string
+    {
+        return $this->language->getMethodName($operation);
+    }
+
+    protected function uploadIdParameter(Operation $operation): ?Parameter
+    {
+        $content = $operation->requestBody?->content ?? [];
+        $schema = ($content[self::MULTIPART_MEDIA_TYPE] ?? null)?->schema;
+        if (!$schema instanceof ObjectSchema) {
+            return null;
+        }
+
+        $uploadId = null;
+        $binaryProperties = 0;
+        foreach ($schema->properties as $name => $property) {
+            if (!$property instanceof StringSchema || $property->format !== 'binary') {
                 continue;
             }
 
-            $responseModels[] = $modelName;
+            $binaryProperties++;
+            if ($binaryProperties > 1) {
+                return null;
+            }
+
+            $idName = $name . 'Id';
+            $idProperty = $schema->properties[$idName] ?? null;
+            if (!$idProperty instanceof StringSchema || $idProperty->format === 'binary') {
+                continue;
+            }
+
+            $uploadId = $this->requestBodyParameter($idName, $idProperty, $schema);
         }
 
-        if (
-            $responseModels === []
-            && !empty($method['responseModel'])
-            && $method['responseModel'] !== 'any'
-        ) {
-            $responseModels[] = $method['responseModel'];
+        return $uploadId;
+    }
+
+    /** @return list<Parameter> */
+    protected function getOperationParameters(Operation $operation, string $location = 'all'): array
+    {
+        $parameters = [];
+        if ($location !== 'body') {
+            foreach ($operation->parameters as $parameter) {
+                if ($location === 'all' && ($parameter->extensions[Extension::SDK_SOURCE->value] ?? '') === 'security') {
+                    continue;
+                }
+                if ($location === 'all' || $parameter->location->value === $location) {
+                    $parameters[] = $parameter;
+                }
+            }
         }
 
-        return $responseModels;
+        if ($location === 'all' || $location === 'body') {
+            foreach ($operation->requestBody?->content ?? [] as $mediaType) {
+                if (!$mediaType->schema instanceof ObjectSchema) {
+                    continue;
+                }
+                foreach ($mediaType->schema->properties as $name => $schema) {
+                    $parameters[] = $this->requestBodyParameter($name, $schema, $mediaType->schema);
+                }
+                break;
+            }
+        }
+
+        // Only the combined list is presented as a method signature, so only
+        // it needs required-first ordering. A body list is serialised as an
+        // object and must keep spec order.
+        if ($location === 'all') {
+            \usort($parameters, static fn(Parameter $left, Parameter $right): int => (int) $right->required - (int) $left->required);
+        }
+        return $parameters;
+    }
+
+    private function requestBodyParameter(string $name, Schema $schema, ObjectSchema $object): Parameter
+    {
+        return new Parameter(
+            name: $name,
+            location: ParameterLocation::QUERY,
+            description: $schema->description,
+            required: \in_array($name, $object->required, true),
+            schema: $schema,
+            extensions: $schema->extensions,
+        );
+    }
+
+    protected function getSchema(Schema|Parameter $value): Schema
+    {
+        return $value instanceof Parameter ? ($value->schema ?? new AnySchema()) : $value;
+    }
+
+    protected function getSchemaType(Schema|Parameter $value): string
+    {
+        $schema = $this->getSchema($value);
+        return match (true) {
+            $schema instanceof StringSchema && $schema->format === 'binary' => 'file',
+            $schema instanceof StringSchema,
+            $schema instanceof CompositeSchema && $this->language->isStringEnum($schema) => 'string',
+            $schema instanceof IntegerSchema => 'integer',
+            $schema instanceof NumberSchema => 'number',
+            $schema instanceof BooleanSchema => 'boolean',
+            $schema instanceof ArraySchema => 'array',
+            default => 'object',
+        };
+    }
+
+    protected function getSchemaName(Schema $schema): string
+    {
+        return $this->schemaNames[\spl_object_id($schema)] ?? $schema->title ?? '';
+    }
+
+    protected function getSchemaModel(Schema|Parameter $value): string
+    {
+        $models = $this->getSchemaModels($value);
+        return \count($models) === 1 ? $models[0] : '';
+    }
+
+    /** @return list<string> */
+    protected function getSchemaModels(Schema|Parameter $value): array
+    {
+        $schema = $this->getSchema($value);
+        if ($schema instanceof ReferenceSchema) {
+            return [$this->normalizeSchemaReference($schema->reference)];
+        }
+        if ($schema instanceof ArraySchema) {
+            return $this->getSchemaModels($schema->items);
+        }
+        if ($schema instanceof CompositeSchema) {
+            $models = [];
+            foreach ($schema->schemas as $member) {
+                \array_push($models, ...$this->getSchemaModels($member));
+            }
+            return \array_values(\array_unique($models));
+        }
+        return [];
+    }
+
+    /** @return list<string> */
+    protected function getSchemaDependencyNames(Schema|Parameter $value): array
+    {
+        return \array_values(\array_filter(\array_unique([
+            ...$this->getSchemaModels($value),
+            $this->getSchemaModel($value),
+        ])));
+    }
+
+    /** @return list<string> */
+    protected function getSchemaDependencies(Schema $schema): array
+    {
+        $dependencies = $this->getSchemaDependencyNames($schema);
+        if ($schema instanceof ArraySchema) {
+            \array_push($dependencies, ...$this->getSchemaDependencies($schema->items));
+        } elseif ($schema instanceof ObjectSchema) {
+            foreach ($schema->properties as $property) {
+                \array_push($dependencies, ...$this->getSchemaDependencies($property));
+            }
+        } elseif ($schema instanceof CompositeSchema) {
+            foreach ($schema->schemas as $member) {
+                \array_push($dependencies, ...$this->getSchemaDependencies($member));
+            }
+        }
+        return \array_values(\array_unique($dependencies));
+    }
+
+    protected function getEnumName(Schema|Parameter $value): string
+    {
+        $enumSchema = $this->language->getEnumSchema($value);
+        if ($enumSchema->enum === []) {
+            return '';
+        }
+        return (string) (($enumSchema instanceof StringSchema ? $enumSchema->enumName : null)
+            ?? $enumSchema->title
+            ?? $this->schemaEnumNames[\spl_object_id($enumSchema)]
+            ?? ($value instanceof Parameter ? $value->name : ''));
+    }
+
+    protected function normalizeSchemaReference(string $reference): string
+    {
+        return \str_replace(['#/components/schemas/', '#/definitions/'], '', $reference);
+    }
+
+    protected function indexSchemas(): void
+    {
+        foreach ($this->spec->schemas as $modelName => $schema) {
+            $this->schemaNames[\spl_object_id($schema)] = $modelName;
+            if (!$schema instanceof ObjectSchema) {
+                continue;
+            }
+            foreach ($schema->properties as $propertyName => $property) {
+                $id = \spl_object_id($property);
+                $this->schemaNames[$id] = $propertyName;
+                $this->schemaEnumNames[$id] = \ucfirst($modelName) . \ucfirst($propertyName);
+                if (\in_array($propertyName, $schema->required, true)) {
+                    $this->requiredSchemas[$id] = true;
+                }
+                if ($property instanceof ArraySchema) {
+                    $itemId = \spl_object_id($property->items);
+                    $this->schemaNames[$itemId] = $propertyName;
+                    $this->schemaEnumNames[$itemId] = \ucfirst($modelName) . \ucfirst($propertyName);
+                }
+
+                $enumSchema = $this->language->getEnumSchema($property);
+                $enumId = \spl_object_id($enumSchema);
+                $this->schemaNames[$enumId] = $propertyName;
+                $this->schemaEnumNames[$enumId] = \ucfirst($modelName) . \ucfirst($propertyName);
+            }
+        }
+
+        $this->indexMultipartSchemas();
+    }
+
+    /**
+     * A multipart body carries no nullability information — every part is
+     * either present or absent on the wire, so a part must never be emitted
+     * as an explicit null.
+     */
+    protected function indexMultipartSchemas(): void
+    {
+        foreach ($this->spec->operations() as $operation) {
+            $content = $operation->requestBody?->content[self::MULTIPART_MEDIA_TYPE] ?? null;
+            if (!$content?->schema instanceof ObjectSchema) {
+                continue;
+            }
+            foreach ($content->schema->properties as $property) {
+                $this->multipartSchemas[\spl_object_id($property)] = true;
+            }
+        }
+    }
+
+    /** @return array<string, SecurityScheme> */
+    protected function getGlobalHeaders(): array
+    {
+        $headers = [];
+        foreach (\array_keys($this->spec->securitySchemes) as $name) {
+            $scheme = $this->getSecurityScheme($name);
+            if (!$scheme instanceof SecurityScheme) {
+                continue;
+            }
+            if (
+                ($scheme->type === SecuritySchemeType::API_KEY && $scheme->location === ParameterLocation::HEADER)
+                || ($scheme->type === SecuritySchemeType::HTTP && $scheme->scheme === 'bearer')
+            ) {
+                $headers[$name] = $scheme->type === SecuritySchemeType::HTTP
+                    ? new SecurityScheme(
+                        type: $scheme->type,
+                        description: $scheme->description,
+                        name: 'Authorization',
+                        location: $scheme->location,
+                        scheme: $scheme->scheme,
+                        bearerFormat: $scheme->bearerFormat,
+                        flows: $scheme->flows,
+                        openIdConnectUrl: $scheme->openIdConnectUrl,
+                        extensions: $scheme->extensions,
+                    )
+                    : $scheme;
+            }
+        }
+        return $headers;
+    }
+
+    protected function getEndpointDocs(): string
+    {
+        foreach ($this->spec->servers as $server) {
+            if (\str_contains($server->url, '{region}')) {
+                return \preg_replace_callback('/\{([^}]+)\}/', static fn(array $match): string => '<' . \strtoupper($match[1]) . '>', $server->url) ?? '';
+            }
+        }
+        return $this->spec->servers[0]->url ?? '';
+    }
+
+    /** @return list<string> */
+    protected function getProduces(Operation $operation): array
+    {
+        $produces = [];
+        foreach ($operation->responses as $response) {
+            foreach (\array_keys($response->content) as $contentType) {
+                if ($contentType !== '' && !\in_array($contentType, $produces, true)) {
+                    $produces[] = $contentType;
+                }
+            }
+        }
+        if ($produces === []) {
+            $produces = ['application/json'];
+        }
+        return $produces;
+    }
+
+    /** @return array<string, string> */
+    protected function getMethodHeaders(Operation $operation): array
+    {
+        $headers = [];
+
+        // Insertion order is the emitted order, and the GraphQL marker comes
+        // before the negotiated headers in every published SDK.
+        if ($this->language->getMethodType($operation, $this->spec) === 'graphql') {
+            $headers['x-sdk-graphql'] = 'true';
+        }
+
+        $consumes = \array_keys($operation->requestBody?->content ?? []);
+        if ($consumes === [] && !\in_array($operation->method->value, ['get', 'head'], true)) {
+            $consumes = ['application/json'];
+        }
+        if ($consumes !== []) {
+            $headers['content-type'] = array_last($consumes);
+        }
+        $produces = $this->getProduces($operation);
+        if ($produces !== []) {
+            $headers['accept'] = \implode(', ', $produces);
+        }
+        return $headers;
+    }
+
+    /**
+     * The schemes an example configures on the client before calling a method.
+     *
+     * A per-platform document lists them flat; the canonical document keys them
+     * by platform, since client and console examples configure the project only
+     * while server examples add one credential.
+     *
+     * @return array<string, SecurityScheme>
+     */
+    protected function getOperationAuthSchemes(Operation $operation): array
+    {
+        $auth = $operation->extensions[Extension::APPWRITE->value][Appwrite::AUTH->value] ?? [];
+        if (!\is_array($auth)) {
+            return [];
+        }
+        $auth = $auth[$this->getParam('platform')] ?? $auth;
+        $schemes = [];
+        $pathSchemes = [];
+        $optional = \array_diff($operation->acceptedSecuritySchemeNames(), $operation->requiredSecuritySchemeNames());
+        foreach (\array_keys($auth) as $name) {
+            // Example configuration is independent of API authentication. Only
+            // omit a candidate when security explicitly makes it optional.
+            if (\in_array($name, $optional, true)) {
+                continue;
+            }
+            $scheme = $this->getSecurityScheme((string) $name);
+            if (!$scheme instanceof SecurityScheme) {
+                continue;
+            }
+            if (($scheme->extensions[Extension::APPWRITE->value][Appwrite::LOCATION->value] ?? '') === 'path' && $scheme->name !== null) {
+                $pathSchemes[\ucfirst($this->helperCamelCase($scheme->name))] = $scheme;
+            } else {
+                $schemes[$name] = $scheme;
+            }
+        }
+        return [...$schemes, ...$pathSchemes];
+    }
+
+    /** @return array<string, SecurityScheme> */
+    protected function getOperationSecuritySchemes(Operation $operation, ?ParameterLocation $location = null, bool $includeGlobal = true): array
+    {
+        $schemes = [];
+        foreach ($operation->acceptedSecuritySchemeNames() as $name) {
+            $scheme = $this->getSecurityScheme($name);
+            if (!$scheme instanceof SecurityScheme) {
+                continue;
+            }
+            if (($scheme->extensions[Extension::APPWRITE->value][Appwrite::LOCATION->value] ?? '') === 'path') {
+                if (!$location instanceof ParameterLocation) {
+                    $schemes[$name] = $scheme;
+                }
+                continue;
+            }
+            if ($location instanceof ParameterLocation && $scheme->location !== $location) {
+                continue;
+            }
+            if (!$includeGlobal && $name !== 'Project') {
+                continue;
+            }
+            $schemes[$name] = $scheme;
+        }
+        return $schemes;
+    }
+
+    /**
+     * Standard single-property discriminator cases. Compound selection is
+     * represented by constrained unions, not vendor extensions.
+     *
+     * @return array<string, array<string, string>>
+     */
+    protected function getDiscriminatorCases(Discriminator $discriminator): array
+    {
+        $cases = [];
+
+        foreach ($discriminator->mapping as $value => $reference) {
+            $name = $this->normalizeSchemaReference($reference);
+            if ($name === '') {
+                continue;
+            }
+            $cases[$name] = [$discriminator->propertyName => (string) $value];
+        }
+
+        return $cases;
+    }
+
+    /** @return array<string, array<string, string>> */
+    protected function getConditionalCases(CompositeSchema $schema): array
+    {
+        $cases = [];
+        foreach ($schema->conditionalReferences() as $branch) {
+            $name = $this->normalizeSchemaReference($branch['reference']);
+            if ($name === '' || \array_key_exists($name, $cases)) {
+                throw new UnexpectedValueException('Conditional response references must identify distinct models.');
+            }
+            $conditions = [];
+            foreach ($branch['conditions'] as $condition) {
+                // Appwrite specs use string conditions. Reject unsupported types
+                // rather than silently stringify their selection rules.
+                if (!\is_string($condition['value'])) {
+                    throw new UnexpectedValueException('Conditional response literals must be strings.');
+                }
+                $conditions[$condition['propertyName']] = $condition['value'];
+            }
+            foreach ($cases as $existing) {
+                if (\count($existing) !== \count($conditions)) {
+                    continue;
+                }
+                $disjoint = array_any($conditions, fn($value, $property): bool => \array_key_exists((string) $property, $existing) && $existing[$property] !== $value);
+                if (!$disjoint) {
+                    throw new UnexpectedValueException('Conditional response cases overlap at equal specificity.');
+                }
+            }
+            $cases[$name] = $conditions;
+        }
+        return $cases;
+    }
+
+    protected function getResponseDiscriminator(Operation $operation): array
+    {
+        foreach ($operation->responses as $response) {
+            foreach ($response->content as $mediaType) {
+                $schema = $mediaType->schema;
+                if (!$schema instanceof CompositeSchema) {
+                    continue;
+                }
+                $mapping = $this->getConditionalCases($schema);
+                if ($mapping === [] && $schema->discriminator instanceof Discriminator) {
+                    $mapping = $this->getDiscriminatorCases($schema->discriminator);
+                }
+                if ($mapping === []) {
+                    continue;
+                }
+
+                // Most specific first, so a two-condition case is tested before
+                // the one-condition case that would otherwise shadow it.
+                \uksort($mapping, static fn(string $left, string $right): int => \count($mapping[$right]) <=> \count($mapping[$left]));
+
+                return $mapping;
+            }
+        }
+        return [];
     }
 }

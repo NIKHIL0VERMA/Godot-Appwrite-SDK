@@ -16,12 +16,27 @@ The generator does not auto-discover templates. Every output file must have an e
 
 | Parent | Children affected |
 |--------|------------------|
-| `Node` | `CLI`, `ReactNative` |
+| `JS` | `Web`, `Deno` |
+| `Web` | `Node`, `ReactNative` |
 | `Dart` | `Flutter` |
 | `Swift` | `Apple` |
 | `Kotlin` | `Android` |
+| `Go` | `CLI` |
 
 Modifying a parent's template or `getFiles()` affects all children. Regenerate and verify child SDKs too.
+
+**One coupling is not visible in the hierarchy.**
+
+`templates/cli/install.sh.twig` and `templates/cli/install.ps1.twig` build every download
+URL from `language.params.npmPackage`. The same parameter names release assets produced
+by `.goreleaser.yaml` and consumed by the Scoop manifest and npm platform packages.
+Change the asset naming in one place and all four must move together.
+
+Regenerate the CLI after changing any of them:
+
+```bash
+php example.php cli
+```
 
 ### Rule 4: `copy` scope = no Twig processing
 
@@ -36,30 +51,171 @@ The `destination` string in each `getFiles()` entry supports Twig expressions an
 
 ### Rule 6: Never modify lock file templates directly
 
-Lock file templates (`package-lock.json.twig`, `bun.lock.twig`) contain Twig expressions that get corrupted if you copy a raw lock file over them. Always use the update script:
+Lock file templates (`package-lock.json.twig`) contain Twig expressions that get corrupted if you copy a raw lock file over them. Always use the update script:
 
 ```bash
-./scripts/update-lockfiles.sh cli    # update CLI lock files only
-./scripts/update-lockfiles.sh all    # update all TS-based SDK lock files
+./scripts/update-lockfiles.sh all
 ```
 
-The script strips Twig expressions before running `npm install`/`bun install`, then restores them automatically. Never run `cp package-lock.json package-lock.json.twig` or edit these files by hand.
+The script strips Twig expressions before running `npm install`, then restores them automatically. Never copy a raw lock file over a lock template or edit one by hand.
+
+### Rule 7: Generated source must already be formatter-clean
+
+A clean generation must already match the target formatter. Do not add a post-generation formatting step or run a formatter to fix generated output in place—the fix belongs in the Twig template.
+
+When you change templates for a language below, regenerate and run that language's check. Child SDKs inherit parent templates — regenerate those too.
+
+- **Go / CLI** — `gofmt`
+
+  ```bash
+  php example.php go <platform>
+  test -z "$(gofmt -l examples/go)"
+  ```
+
+  `CLI` inherits from `Go`. After shared Go template changes:
+
+  ```bash
+  php example.php cli
+  test -z "$(gofmt -l examples/cli)"
+  ```
+
+- **Dart / Flutter** — `dart format`
+
+  ```bash
+  rm -rf examples/dart examples/flutter
+  php example.php dart <platform>
+  (cd examples/dart && dart pub get)
+  dart format --output=none --set-exit-if-changed examples/dart
+  ```
+
+  `Flutter` inherits from `Dart`. After shared Dart template changes:
+
+  ```bash
+  php example.php flutter client
+  (cd examples/flutter && flutter pub get)
+  dart format --output=none --set-exit-if-changed examples/flutter
+  ```
+
+- **Kotlin / Android** — ktlint 1.8.0 (`ktlint_official`)
+
+  ```bash
+  rm -rf examples/kotlin examples/android
+  php example.php kotlin server
+  (cd examples/kotlin && ktlint '**/*.kt' '**/*.kts')
+  ```
+
+  `Android` inherits from `Kotlin`. After shared Kotlin template changes:
+
+  ```bash
+  php example.php android client
+  (cd examples/android && ktlint '**/*.kt' '**/*.kts')
+  ```
+
+- **Python** — Black
+
+  ```bash
+  rm -rf examples/python
+  php example.php python <platform>
+  (cd examples/python && find appwrite test -name '*.py' -print0 | xargs -0 python -m black --check)
+  (cd examples/python && python -m black --check setup.py)
+  ```
+
+- **Ruby** — RuboCop 1.90.0 (Layout cops, 4-space indent)
+
+  ```bash
+  rm -rf examples/ruby
+  php example.php ruby server
+  (cd examples/ruby && rubocop)
+  ```
+
+- **PHP** — Pint, PHPStan, and Rector
+
+  ```bash
+  rm -rf examples/php
+  php example.php php server
+  (cd examples/php && composer install)
+  (cd examples/php && composer lint && composer analyse && composer refactor)
+  ```
+
+- **Rust** — rustfmt 1.83.0
+
+  ```bash
+  rm -rf examples/rust
+  php example.php rust server
+  (cd examples/rust && cargo +1.83.0 fmt --check --all)
+  ```
+
+- **C# / Unity** — `dotnet format whitespace` (4-space indent)
+
+  ```bash
+  rm -rf examples/dotnet examples/unity
+  php example.php dotnet server
+  (cd examples/dotnet && dotnet format whitespace --folder --verify-no-changes)
+  ```
+
+  `Unity` inherits from `DotNet` and reuses several `templates/dotnet/Package/**` files. After shared .NET template changes:
+
+  ```bash
+  php example.php unity client
+  (cd examples/unity && dotnet format whitespace --folder --verify-no-changes)
+  ```
+
+- **Swift / Apple** — swift-format 6.1 (4-space indent, lineLength 200)
+
+  ```bash
+  rm -rf examples/swift examples/apple
+  php example.php swift server
+  (cd examples/swift && swift-format lint --recursive --strict --configuration .swift-format .)
+  ```
+
+  `Apple` inherits from `Swift`. After shared Swift template changes:
+
+  ```bash
+  php example.php apple client
+  (cd examples/apple && swift-format lint --recursive --strict --configuration .swift-format .)
+  ```
+
+- **Web / Node / React Native** — Prettier, ESLint, and tsc
+
+  ```bash
+  rm -rf examples/web
+  php example.php web <platform>
+  (cd examples/web && npm ci && npm run format:check && npm run lint && npm run analyse)
+  ```
+
+  Prettier's layout depends on the print width, so a template cannot always know
+  whether a construct fits on one line. `src/SDK/Language/Web.php` and
+  `src/SDK/Language/JS.php` render the width-sensitive constructs (method
+  signatures, union and conditional types, guards, assignments) through helpers
+  exposed as Twig filters. Extend those helpers rather than hand-wrapping output
+  in a template.
+
+  `Node` and `ReactNative` read several `templates/web/src/**` files directly,
+  and both ship the same checks. After shared Web template changes:
+
+  ```bash
+  php example.php node server
+  (cd examples/node && npm ci && npm run format:check && npm run lint && npm run analyse && npm run test)
+
+  php example.php react-native client
+  (cd examples/react-native && npm ci --omit=peer && npm run format:check && npm run lint && npm run analyse)
+  ```
 
 ## Repository at a Glance
 
 - **Purpose:** Generate Appwrite SDKs and tooling targets for 20+ languages/platforms from Swagger/OpenAPI specs using Twig templates
 - **Language:** PHP (generator engine) + Twig (templates)
 - **Entry point:** `example.php` — runs generation for all or a specific SDK
-- **Output:** `examples/<lang>/` — checked-in generated SDK output for verification
+- **Output:** `examples/<lang>/` — generated SDK output for local verification. **Not checked in** — `.gitignore` excludes `examples/*`, so it is a scratch area you regenerate, never a diff baseline
 
 ```
 src/SDK/Language/<Lang>.php   ← Language class: defines files, types, keywords
 templates/<lang>/             ← Twig templates for that language
-examples/<lang>/              ← Generated SDK output (checked in for verification)
+examples/<lang>/              ← Generated SDK output (gitignored; regenerate to verify)
 example.php                   ← Entry point: regenerates all SDKs from specs
 ```
 
-**Supported SDKs:** PHP, Web, Node, CLI, Ruby, Python, Dart, Flutter, React Native, Go, Swift, Apple, DotNet, Android, Kotlin, Unity, REST, GraphQL, Rust, AgentSkills, CursorPlugin, ClaudePlugin, CodexPlugin
+**Supported SDKs:** PHP, Web, Node, CLI, Ruby, Python, Dart, Flutter, React Native, Go, Swift, Apple, DotNet, Android, Kotlin, Unity, REST, GraphQL, Rust, Skills, CursorPlugin, ClaudePlugin, CodexPlugin
 
 ## Primary Workflows
 
@@ -70,7 +226,7 @@ example.php                   ← Entry point: regenerates all SDKs from specs
    ```bash
    php example.php <lang>
    ```
-3. Diff `examples/<lang>/` to verify the output is correct
+3. Inspect `examples/<lang>/` to verify the output is correct. `git diff` will **not** show it — `examples/*` is gitignored. To compare before/after, copy `examples/` aside, `git stash -u` your template changes, regenerate, and `diff -r` the two trees. **`-u` matters:** a newly added template is untracked, and a plain `git stash` leaves it in place, so the "before" tree is generated with your change still applied and the comparison shows nothing
 4. Run linters and refactor check:
    ```bash
    composer refactor:check
@@ -128,10 +284,12 @@ public function getFiles(): array
 | Which files get generated | `src/SDK/Language/<Lang>.php` → `getFiles()` |
 | Type mappings for a language | `src/SDK/Language/<Lang>.php` → `getTypeName()` |
 | Available Twig filters | `src/SDK/SDK.php` (around line 62) |
-| How specs are parsed | `src/Spec/OpenAPI3.php`, `src/Spec/Swagger2.php` |
+| Vendor extensions the generator reads | `src/SDK/Extension.php` and `src/SDK/Extension/Appwrite.php`; add a case before reading a new key |
+| Canonical spec parser and DTOs | `utopia-php/openapi` (VCS dependency) |
+| SDK grouping and filtering | `src/SDK/SDK.php` |
 | Generation orchestration | `src/SDK/SDK.php` → `generate()` |
 | Example generation script | `example.php` |
-| Generated output for review | `examples/<lang>/` |
+| Generated output for review (gitignored) | `examples/<lang>/` |
 
 ## Available SDK Names for `example.php`
 
@@ -158,10 +316,11 @@ Pass as first argument to generate only that SDK:
 | `kotlin` | Kotlin | `examples/kotlin/` |
 | `graphql` | GraphQL | `examples/graphql/` |
 | `rust` | Rust | `examples/rust/` |
-| `agent-skills` | AgentSkills | `examples/agent-skills/` |
+| `skills` | Skills | `examples/skills/` |
 | `cursor-plugin` | CursorPlugin | `examples/cursor-plugin/` |
 | `claude-plugin` | ClaudePlugin | `examples/claude-plugin/` |
 | `codex-plugin` | CodexPlugin | `examples/codex-plugin/` |
+| `zed-extension` | ZedExtension | `examples/zed-extension/` |
 
 ## Twig Template Variables by Scope
 
@@ -179,11 +338,12 @@ Pass as first argument to generate only that SDK:
 - **Silent no-op:** A new `.twig` file with no `getFiles()` entry — generation runs successfully but the file is never created
 - **Wrong scope:** Using `default` scope when you need `service` scope means your template can't access `{{ service.name }}`
 - **Copy scope surprises:** A `copy`-scoped file with Twig syntax — the syntax is output literally, not rendered
-- **Spec fetch failure:** `example.php` requires internet access to fetch the live spec from GitHub; generation fails with an exception if the fetch returns empty. Spec URL pattern (prefix is `open-api3` or `swagger2` depending on the format):
+- **Spec fetch failure:** `example.php` requires internet access to fetch the live spec from GitHub; generation fails with an exception if the fetch returns empty. OpenAPI 3 is one canonical document per version and the generator selects the platform from it (`x-appwrite.platforms`); Swagger 2 documents are still per platform:
   ```
-  https://raw.githubusercontent.com/appwrite/specs/main/specs/{version}/open-api3-{version}-{platform}.json
+  https://raw.githubusercontent.com/appwrite/specs/main/specs/{version}/open-api3-{version}.json
+  https://raw.githubusercontent.com/appwrite/specs/main/specs/{version}/swagger2-{version}-{platform}.json
   ```
-- **Spec formats:** `example.php` parses OpenAPI 3 specs by default (`Appwrite\Spec\OpenAPI3`). Swagger 2 (`Appwrite\Spec\Swagger2`) is still fully supported; both formats produce identical SDKs. Pass the format as the third argument:
+- **Spec formats:** `example.php` parses every document through `Utopia\OpenAPI\Parser`. OpenAPI 3 is fetched by default; Swagger 2 is also supported. Pass the fetched format as the third argument:
   ```bash
   php example.php <sdk> <platform> swagger2             # use Swagger 2 spec
   SDK_GEN_SPEC_FILE=/path/to/spec.json php example.php  # use a local spec file
@@ -199,15 +359,16 @@ composer update --ignore-platform-reqs --optimize-autoloader --no-plugins --no-s
 
 ## Running Tests
 
-Tests are split into two suites:
+Both suites generate from the shared fixture `tests/resources/spec-openapi3.json`. Parser behavior is tested by `utopia-php/openapi` rather than this repository.
 
-- `tests/unit/` — fast, pure-PHP tests (spec parsers); no Docker needed
-- `tests/e2e/` — per-language SDK tests; generate an SDK from `tests/resources/spec-openapi3.json` into `tests/e2e/sdks/` and run it in Docker against a mock API. The mock server (`./mock-server`) is started in `setUp()` and removed in `tearDown()` (`docker compose down`); after interrupted runs, clean up with `cd mock-server && docker compose down`
-- `tests/resources/` — shared fixtures (spec file, upload files) used by both suites
+- **`tests/generation/`** proves the *shape* of what the generator emits: for every language and platform it generates into `tests/generation/sdks/` and checks the tree against declarative tables. Excluded fixtures must never appear, platform-bound fixtures (`x-appwrite.platforms` on operations, method aliases and security schemes) must appear on their platforms alone, enums must be declared, Go comments must not carry HTML entities. Fixture tokens are single lowercase `zz*` words so they survive every language's identifier casing. No Docker, runs in seconds.
+- **`tests/e2e/`** proves *behavior*: each language test generates into `tests/e2e/sdks/`, compiles the SDK in Docker and runs `tests/e2e/languages/<lang>` against the mock API, comparing the printed lines to `expectedOutput`. The mock server (`./mock-server`) is started in `setUp()` and removed in `tearDown()` (`docker compose down`); after interrupted runs, clean up with `cd mock-server && docker compose down`.
+
+Put a check where it belongs: something the SDK *does* goes in a language script and `expectedOutput`; something the tree *contains or lacks* goes in a `GenerationTest` table. Do not add unit tests for generator internals that either suite can express.
 
 ```bash
-vendor/bin/phpunit --testsuite Unit        # fast, run these always
-vendor/bin/phpunit tests/e2e/PHP83Test.php # one language e2e (needs Docker)
+vendor/bin/phpunit --testsuite Generation   # every language, no Docker
+vendor/bin/phpunit tests/e2e/PHP85Test.php  # one language e2e (needs Docker)
 ```
 
 If local PHP is missing, is not the required version, or has extension issues, use the matching PHP Docker image as a fallback for that command.
@@ -217,9 +378,12 @@ If local PHP is missing, is not the required version, or has extension issues, u
 Before submitting changes that touch templates or language classes:
 
 - [ ] Regenerated the affected SDK(s) with `example.php`
-- [ ] Inspected `examples/<lang>/` output looks correct
+- [ ] Inspected `examples/<lang>/` output looks correct (gitignored — inspect the files directly, `git status` will not list them)
 - [ ] Any new template files are listed in `getFiles()` of the language class
 - [ ] Any new language class is added to `example.php`
 - [ ] Rector check passes (`composer refactor:check`)
 - [ ] Twig linter passes (`composer lint-twig`)
 - [ ] If a parent language was modified, child SDKs were also checked
+- [ ] If `Concern/CliCommandSurface.php` was touched, the CLI was regenerated and its e2e suite run
+- [ ] CLI changes compile and pass their tests:
+      `cd examples/cli && go build ./... && go vet ./... && go test ./...`

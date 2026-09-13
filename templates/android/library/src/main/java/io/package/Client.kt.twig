@@ -5,9 +5,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import {{ sdk.namespace | caseDot }}.cookies.ListenableCookieJar
 import {{ sdk.namespace | caseDot }}.cookies.stores.SharedPreferencesCookieStore
-import {{ sdk.namespace | caseDot }}.exceptions.{{ spec.title | caseUcfirst }}Exception
+import {{ sdk.namespace | caseDot }}.exceptions.{{ spec.info.title | caseUcfirst }}Exception
 import {{ sdk.namespace | caseDot }}.extensions.fromJson
-import {{ sdk.namespace | caseDot }}.extensions.toJson
+import {{ sdk.namespace | caseDot }}.extensions.toJsonRequestBody
 import {{ sdk.namespace | caseDot }}.models.InputFile
 import {{ sdk.namespace | caseDot }}.models.UploadProgress
 import kotlinx.coroutines.CoroutineScope
@@ -26,8 +26,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.BufferedInputStream
 import java.io.BufferedReader
 import java.io.File
-import java.io.RandomAccessFile
 import java.io.IOException
+import java.io.RandomAccessFile
 import java.lang.IllegalArgumentException
 import java.net.CookieManager
 import java.net.CookiePolicy
@@ -45,7 +45,9 @@ import kotlin.coroutines.resume
 
 class Client @JvmOverloads constructor(
     context: Context,
-    var endpoint: String = "{{spec.endpoint}}",
+    @set:JvmSynthetic
+    var endpoint: String = "{{(spec | endpoint)}}",
+    @set:JvmSynthetic
     var endpointRealtime: String? = null,
     private var selfSigned: Boolean = false
 ) : CoroutineScope {
@@ -54,7 +56,7 @@ class Client @JvmOverloads constructor(
         /**
          * The size for chunked uploads in bytes.
          */
-        internal const val CHUNK_SIZE = 5*1024*1024; // 5MB
+        internal const val CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
         internal const val MAX_CONCURRENT_UPLOADS = 8
         internal const val GLOBAL_PREFS = "{{ sdk.namespace | caseDot }}"
         internal const val COOKIE_PREFS = "myCookie"
@@ -89,14 +91,14 @@ class Client @JvmOverloads constructor(
     init {
         headers = mutableMapOf(
             "content-type" to "application/json",
-            "origin" to "{{ spec.title | caseLower }}-android://${context.packageName}",
+            "origin" to "{{ spec.info.title | caseLower }}-android://${context.packageName}",
             "user-agent" to "${context.packageName}/${appVersion}, ${System.getProperty("http.agent")}",
             "x-sdk-name" to "{{ sdk.name }}",
             "x-sdk-platform" to "{{ sdk.platform }}",
             "x-sdk-language" to "{{ language.name | caseLower }}",
-            "x-sdk-version" to "{{ sdk.version }}"{% if spec.global.defaultHeaders | length > 0 %},{% endif %}
+            "x-sdk-version" to "{{ sdk.version }}"{% if defaultHeaders | length > 0 %},{% endif %}
 
-{% for key,header in spec.global.defaultHeaders %}
+{% for key,header in defaultHeaders %}
             "{{ key | caseLower }}" to "{{ header }}"{% if not loop.last %},{% endif %}
 {% endfor %}
 
@@ -106,22 +108,22 @@ class Client @JvmOverloads constructor(
         setSelfSigned(selfSigned)
     }
 
-{% for header in spec.global.headers %}
+{% for headerKey, header in globalHeaders %}
     /**
-     * Set {{header.key | caseUcfirst}}
+     * Set {{headerKey | caseUcfirst}}
      *
 {% if header.description %}
      * {{header.description}}
      *
 {% endif %}
-     * @param {string} {{header.key | caseLower}}
+     * @param {string} {{headerKey | caseLower}}
      *
      * @return this
      */
-    fun set{{header.key | caseUcfirst}}(value: String): Client {
-        config["{{ header.key | caseCamel }}"] = value
-        {%~ if header.global %}
-        addHeader("{{ header.name | caseLower }}", value)
+    fun set{{headerKey | caseUcfirst}}(value: String): Client {
+        config["{{ headerKey | caseCamel }}"] = value
+        {%~ if (headerKey != 'Project') %}
+        addHeader("{{ header.name | caseLower }}", {% if header.scheme == 'bearer' %}"Bearer $value"{% else %}value{% endif %})
         {%~ endif %}
         return this
     }
@@ -250,7 +252,7 @@ class Client @JvmOverloads constructor(
      */
     fun getHttpClient(): OkHttpClient = http
 
-    {%~ for clientMethodName, clientMethods in spec.clientMethods %}
+    {%~ for clientMethodName, clientMethods in clientMethods %}
     {%~ for clientMethod in clientMethods %}
     /**
      * {{ clientMethod.description | replace({'\n': '\n     * '}) | raw }}
@@ -261,16 +263,16 @@ class Client @JvmOverloads constructor(
         val apiPath = "{{ clientMethod.path }}"
         val apiParams = mutableMapOf<String, Any?>()
         val apiHeaders = mutableMapOf(
-            {%~ for key, security in clientMethod.securityHeaders %}
+            {%~ for key, security in (clientMethod | securityHeaders) %}
             "{{ security.name }}" to config["{{ key | caseLower }}"].orEmpty(),
             {%~ endfor %}
-            {%~ for key, header in clientMethod.headers %}
+            {%~ for key, header in (clientMethod | methodHeaders) %}
             "{{ key }}" to "{{ header }}",
             {%~ endfor %}
         )
 
         return call(
-            "{{ clientMethod.method | caseUpper }}",
+            "{{ clientMethod.method.value | caseUpper }}",
             apiPath,
             apiHeaders,
             apiParams,
@@ -281,24 +283,22 @@ class Client @JvmOverloads constructor(
     {%~ endfor %}
 
     /**
-     * Send the HTTP request
+     * Prepare the HTTP request
      *
      * @param method
      * @param path
      * @param headers
      * @param params
      *
-     * @return [T]
+     * @return [Request]
      */
-    @Throws({{ spec.title | caseUcfirst }}Exception::class)
-    suspend fun <T> call(
+    @Throws({{ spec.info.title | caseUcfirst }}Exception::class)
+    suspend fun prepareRequest(
         method: String,
         path: String,
-        headers:  Map<String, String> = mapOf(),
+        headers: Map<String, String> = mapOf(),
         params: Map<String, Any?> = mapOf(),
-        responseType: Class<T>,
-        converter: ((Any) -> T)? = null
-    ): T {
+    ): Request {
         val filteredParams = params.filterValues { it != null }
 
         val requestHeaders = this.headers.toHeaders().newBuilder()
@@ -327,13 +327,12 @@ class Client @JvmOverloads constructor(
                     }
                 }
             }
-            val request = Request.Builder()
+
+            return Request.Builder()
                 .url(httpBuilder.build())
                 .headers(requestHeaders)
                 .get()
                 .build()
-
-            return awaitResponse(request, responseType, converter)
         }
 
         val body = if (MultipartBody.FORM.toString() == headers["content-type"]) {
@@ -360,17 +359,38 @@ class Client @JvmOverloads constructor(
             }
             builder.build()
         } else {
-            filteredParams
-                .toJson()
+            params
+                .toJsonRequestBody()
                 .toRequestBody("application/json".toMediaType())
         }
 
-        val request = Request.Builder()
+        return Request.Builder()
             .url(httpBuilder.build())
             .headers(requestHeaders)
             .method(method, body)
             .build()
+    }
 
+    /**
+     * Send the HTTP request
+     *
+     * @param method
+     * @param path
+     * @param headers
+     * @param params
+     *
+     * @return [T]
+     */
+    @Throws({{ spec.info.title | caseUcfirst }}Exception::class)
+    suspend fun <T> call(
+        method: String,
+        path: String,
+        headers: Map<String, String> = mapOf(),
+        params: Map<String, Any?> = mapOf(),
+        responseType: Class<T>,
+        converter: ((Any) -> T)? = null
+    ): T {
+        val request = prepareRequest(method, path, headers, params)
         return awaitResponse(request, responseType, converter)
     }
 
@@ -383,10 +403,10 @@ class Client @JvmOverloads constructor(
      *
      * @return [T]
      */
-    @Throws({{ spec.title | caseUcfirst }}Exception::class)
+    @Throws({{ spec.info.title | caseUcfirst }}Exception::class)
     suspend fun <T> chunkedUpload(
         path: String,
-        headers:  MutableMap<String, String>,
+        headers: MutableMap<String, String>,
         params: MutableMap<String, Any?>,
         responseType: Class<T>,
         converter: ((Any) -> T),
@@ -395,7 +415,7 @@ class Client @JvmOverloads constructor(
         onProgress: ((UploadProgress) -> Unit)? = null,
     ): T {
         val input = params[paramName] as InputFile
-        val size: Long = when(input.sourceType) {
+        val size: Long = when (input.sourceType) {
             "path", "file" -> {
                 File(input.path).length()
             }
@@ -406,7 +426,7 @@ class Client @JvmOverloads constructor(
         }
 
         if (size < CHUNK_SIZE) {
-            val data = when(input.sourceType) {
+            val data = when (input.sourceType) {
                 "file", "path" -> File(input.path).asRequestBody()
                 "bytes" -> (input.data as ByteArray).toRequestBody(input.mimeType.toMediaType())
                 else -> throw UnsupportedOperationException()
@@ -430,24 +450,25 @@ class Client @JvmOverloads constructor(
         var result: Map<*, *>? = null
         var uploadId: String? = null
 
-        if (idParamName?.isNotEmpty() == true) {
+        val providedUploadId = idParamName?.let { params[it]?.toString() }
+        if (!providedUploadId.isNullOrEmpty()) {
             // Make a request to check if a file already exists
             val current = call(
                 method = "GET",
-                path = "$path/${params[idParamName]}",
+                path = "$path/$providedUploadId",
                 headers = headers,
                 params = emptyMap(),
                 responseType = Map::class.java,
             )
             val chunksUploaded = current["chunksUploaded"] as Long
             offset = chunksUploaded * CHUNK_SIZE
-            uploadId = params[idParamName]?.toString()
+            uploadId = providedUploadId
             result = current
         }
 
         fun readChunk(start: Long, end: Long): ByteArray {
             val length = (end - start).toInt()
-            return when(input.sourceType) {
+            return when (input.sourceType) {
                 "file", "path" -> {
                     RandomAccessFile(input.path, "r").use { chunkFile ->
                         val chunk = ByteArray(length)
@@ -476,7 +497,7 @@ class Client @JvmOverloads constructor(
             val chunkHeaders = headers.toMutableMap()
 
             if (includeUploadId && uploadId != null) {
-                chunkHeaders["x-{{ spec.title | caseLower }}-id"] = uploadId!!
+                chunkHeaders["x-{{ spec.info.title | caseLower }}-id"] = uploadId!!
             }
 
             chunkHeaders["Content-Range"] = "bytes $start-${end - 1}/$size"
@@ -582,7 +603,7 @@ class Client @JvmOverloads constructor(
      *
      * @return [T]
      */
-    @Throws({{ spec.title | caseUcfirst }}Exception::class)
+    @Throws({{ spec.info.title | caseUcfirst }}Exception::class)
     private suspend fun <T> awaitResponse(
         request: Request,
         responseType: Class<T>,
@@ -607,20 +628,20 @@ class Client @JvmOverloads constructor(
                     val error = if (response.headers["content-type"]?.contains("application/json") == true) {
                         val map = body.fromJson<Map<String, Any>>()
 
-                        {{ spec.title | caseUcfirst }}Exception(
+                        {{ spec.info.title | caseUcfirst }}Exception(
                             map["message"] as? String ?: "",
                             (map["code"] as Number).toInt(),
                             map["type"] as? String ?: "",
                             body
                         )
                     } else {
-                        {{ spec.title | caseUcfirst }}Exception(body, response.code, "", body)
+                        {{ spec.info.title | caseUcfirst }}Exception(body, response.code, "", body)
                     }
                     it.cancel(error)
                     return
                 }
 
-                val warnings = response.headers["x-{{ spec.title | lower }}-warning"]
+                val warnings = response.headers["x-{{ spec.info.title | lower }}-warning"]
                 if (warnings != null) {
                     warnings.split(";").forEach { warning ->
                         System.err.println("Warning: $warning")

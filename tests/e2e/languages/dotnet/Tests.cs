@@ -24,6 +24,7 @@ namespace AppwriteTests
         {
             var client = new Client()
                 .AddHeader("Origin", "http://localhost")
+                .SetProject("console")
                 .SetSelfSigned(true);
             var sdkHeaders = client.GetHeaders();
             TestContext.WriteLine($"x-sdk-name: {sdkHeaders["x-sdk-name"]}; x-sdk-platform: {sdkHeaders["x-sdk-platform"]}; x-sdk-language: {sdkHeaders["x-sdk-language"]}; x-sdk-version: {sdkHeaders["x-sdk-version"]}");
@@ -69,6 +70,20 @@ namespace AppwriteTests
             var result = await general.Redirect();
             TestContext.WriteLine((result as Dictionary<string, object>)["result"]);
 
+            foreach (var ids in new[] { new[] { "", "0" }, new[] { "0", "" } })
+            {
+                try
+                {
+                    await general.ValidatePath(ids[1], ids[0]);
+                    throw new System.Exception("Empty path parameter was accepted");
+                }
+                catch (AppwriteException e)
+                {
+                    TestContext.WriteLine(e.Message);
+                }
+            }
+            TestContext.WriteLine((await general.ValidatePath("0", "0")).Result);
+
             mock = await general.Upload("string", 123, new List<string>() { "string in array" }, InputFile.FromPath("../../../../../../../resources/file.png"));
             TestContext.WriteLine(mock.Result);
 
@@ -82,6 +97,8 @@ namespace AppwriteTests
             info = new FileInfo("../../../../../../../resources/large_file.mp4");
             mock = await general.Upload("string", 123, new List<string>() { "string in array" }, InputFile.FromStream(info.OpenRead(), "large_file.mp4", "video/mp4"));
             TestContext.WriteLine(mock.Result);
+
+            TestContext.WriteLine(System.Text.Encoding.UTF8.GetString(await general.Download()));
 
             mock = await general.Enum(MockType.First);
             TestContext.WriteLine(mock.Result);
@@ -195,6 +212,9 @@ namespace AppwriteTests
             TestContext.WriteLine(Query.DistanceGreaterThan("location", new List<object> { 40.7128, -74 }, 1000, true));
             TestContext.WriteLine(Query.DistanceLessThan("location", new List<object> { 40.7128, -74 }, 1000));
             TestContext.WriteLine(Query.DistanceLessThan("location", new List<object> { 40.7128, -74 }, 1000, true));
+            TestContext.WriteLine(Query.VectorDot("embedding", new List<double> { 0.1, 0.2, 0.3 }));
+            TestContext.WriteLine(Query.VectorCosine("embedding", new List<double> { 0.1, 0.2, 0.3 }));
+            TestContext.WriteLine(Query.VectorEuclidean("embedding", new List<double> { 0.1, 0.2, 0.3 }));
             
             // Spatial query tests
             TestContext.WriteLine(Query.Intersects("location", new List<object> { 40.7128, -74 }));

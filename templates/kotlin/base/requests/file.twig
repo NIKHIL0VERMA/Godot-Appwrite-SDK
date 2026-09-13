@@ -1,7 +1,8 @@
-        val idParamName: String? = {% if method.parameters.all | filter(p => p.isUploadID) | length > 0 %}{% for parameter in method.parameters.all | filter(parameter => parameter.isUploadID) %}"{{ parameter.name }}"{% endfor %}{% else %}null{% endif %}
+{% set uploadIdParameter = method | uploadIdParameter %}
+        val idParamName: String? = {% if uploadIdParameter %}"{{ uploadIdParameter.name }}"{% else %}null{% endif %}
 
-        {%~ for parameter in method.parameters.all %}
-        {%~ if parameter.type == 'file' %}
+        {%~ for parameter in (method | parameters('all')) %}
+        {%~ if (parameter | schemaType) == 'file' %}
         val paramName = "{{ parameter.name }}"
         {%~ endif %}
         {%~ endfor %}
@@ -10,7 +11,7 @@
             apiHeaders,
             apiParams,
             responseType = {{ method | returnType(spec, sdk.namespace | caseDot) | raw }}::class.java,
-            {%~ if method.responseModel %}
+            {%~ if (method | responseModel) %}
             converter,
             {%~ endif %}
             paramName,

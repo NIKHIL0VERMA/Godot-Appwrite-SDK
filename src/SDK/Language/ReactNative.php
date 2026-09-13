@@ -1,11 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Appwrite\SDK\Language;
 
+use Utopia\OpenAPI\Model\Operation;
+use Utopia\OpenAPI\Model\Parameter;
+use Utopia\OpenAPI\Model\Schema;
+use Utopia\OpenAPI\Specification;
 use Override;
 
 class ReactNative extends Web
 {
+    #[Override]
+    protected function getFileExample(): string
+    {
+        // React Native uploads take the URI record that expo-file-system and
+        // the image pickers hand back, not the Node SDK's InputFile helper —
+        // which this SDK neither generates nor exports.
+        return "{ name: 'image.png', type: 'image/png', size: 1024, uri: 'file:///path/to/image.png' }";
+    }
+
     #[Override]
     public function getName(): string
     {
@@ -25,6 +40,11 @@ class ReactNative extends Web
                 'scope' => 'default',
                 'destination' => 'src/client.ts',
                 'template' => 'react-native/src/client.ts.twig',
+            ],
+            [
+                'scope' => 'default',
+                'destination' => 'src/react-native-shim.d.ts',
+                'template' => 'react-native/src/react-native-shim.d.ts.twig',
             ],
             [
                 'scope' => 'default',
@@ -98,7 +118,7 @@ class ReactNative extends Web
             ],
             [
                 'scope' => 'method',
-                'destination' => 'docs/examples/{{service.name | caseLower}}/{{method.name | caseKebab}}.md',
+                'destination' => 'docs/examples/{{service.name | caseLower}}/{{(method | methodName) | caseKebab}}.md',
                 'template' => 'react-native/docs/example.md.twig',
             ],
             [
@@ -128,7 +148,7 @@ class ReactNative extends Web
             ],
             [
                 'scope' => 'enum',
-                'destination' => 'src/enums/{{ enum.name | caseKebab }}.ts',
+                'destination' => 'src/enums/{{ enum.title | caseKebab }}.ts',
                 'template' => 'react-native/src/enums/enum.ts.twig',
             ],
             [
@@ -142,6 +162,21 @@ class ReactNative extends Web
                 'template' => 'react-native/.npmrc',
             ],
             [
+                'scope' => 'copy',
+                'destination' => '.prettierrc',
+                'template' => 'react-native/.prettierrc',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => '.prettierignore',
+                'template' => 'react-native/.prettierignore',
+            ],
+            [
+                'scope' => 'copy',
+                'destination' => 'eslint.config.mjs',
+                'template' => 'react-native/eslint.config.mjs',
+            ],
+            [
                 'scope' => 'default',
                 'destination' => 'package-lock.json',
                 'template' => 'react-native/package-lock.json.twig',
@@ -150,87 +185,22 @@ class ReactNative extends Web
     }
 
     #[Override]
-    public function getTypeName(array $parameter, array $method = []): string
+    public function getTypeName(Schema|Parameter $parameter, ?Specification $spec = null): string
     {
-        if (($parameter['type'] ?? '') === self::TYPE_FILE) {
-            return '{name: string, type: string, size: number, uri: string}';
+        if ($this->getSchemaType($parameter) === self::TYPE_FILE) {
+            return '{ name: string; type: string; size: number; uri: string }';
         }
 
-        return parent::getTypeName($parameter, $method);
+        return parent::getTypeName($parameter, $spec);
     }
 
     #[Override]
-    public function getParamExample(array $param, string $lang = '', array $spec = []): string
+    public function getReturn(Operation $method, Specification $spec): string
     {
-        $type = $param['type'] ?? '';
-        $example = $param['example'] ?? '';
-
-        $hasExample = !empty($example) || $example === 0 || $example === false;
-
-        if (!$hasExample) {
-            return match ($type) {
-                self::TYPE_ARRAY => '[]',
-                self::TYPE_BOOLEAN => 'false',
-                self::TYPE_FILE => 'InputFile.fromPath(\'/path/to/file\', \'filename\')',
-                self::TYPE_INTEGER, self::TYPE_NUMBER => '0',
-                self::TYPE_OBJECT => '{}',
-                self::TYPE_STRING => "''",
-            };
-        }
-
-        return match ($type) {
-            self::TYPE_ARRAY, self::TYPE_FILE, self::TYPE_INTEGER, self::TYPE_NUMBER => $example,
-            self::TYPE_BOOLEAN => ($example) ? 'true' : 'false',
-            self::TYPE_OBJECT => ($example === '{}')
-            ? '{}'
-            : (($formatted = json_encode(json_decode((string) $example, true), JSON_PRETTY_PRINT))
-                ? preg_replace('/\n/', "\n    ", $formatted)
-                : $example),
-            self::TYPE_STRING => "'{$example}'",
+        return match ($this->getMethodType($method, $spec)) {
+            'webAuth' => 'void | URL',
+            'location' => 'Promise<ArrayBuffer>',
+            default => parent::getReturn($method, $spec),
         };
-    }
-
-    #[Override]
-    public function getReturn(array $method, array $spec): string
-    {
-        if ($method['type'] === 'webAuth') {
-            return 'void | URL';
-        } elseif ($method['type'] === 'location') {
-            return 'Promise<ArrayBuffer>';
-        }
-
-        // check for union types i.e. multiple response models
-        $unionType = $this->getUnionReturnType($method, $spec);
-        if ($unionType !== null) {
-            return $unionType;
-        }
-
-        if (array_key_exists('responseModel', $method) && !empty($method['responseModel']) && $method['responseModel'] !== 'any') {
-            $ret = 'Promise<';
-
-            if (
-                array_key_exists((string) $method['responseModel'], $spec['definitions']) &&
-                array_key_exists('additionalProperties', $spec['definitions'][$method['responseModel']]) &&
-                !$spec['definitions'][$method['responseModel']]['additionalProperties']
-            ) {
-                $ret .= 'Models.';
-            }
-
-            $ret .= $this->toPascalCase($method['responseModel']);
-
-            $models = [];
-
-            $this->populateGenerics($method['responseModel'], $spec, $models);
-
-            $models = array_unique($models);
-            $models = array_filter($models, fn($model): bool => $model != $this->toPascalCase($method['responseModel']));
-
-            if ($models !== []) {
-                $ret .= '<' . implode(', ', $models) . '>';
-            }
-
-            return $ret . '>';
-        }
-        return 'Promise<{}>';
     }
 }

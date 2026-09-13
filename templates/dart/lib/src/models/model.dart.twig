@@ -1,86 +1,86 @@
-{% macro sub_schema(property) %}{% if property.sub_schema %}{% if property.type == 'array' %}List<{{property.sub_schema | caseUcfirst | overrideIdentifier}}>{% else %}{{property.sub_schema | caseUcfirst | overrideIdentifier }}{% endif %}{% else %}{% if property.type == 'object' and property.additionalProperties %}Map<String, dynamic>{% else %}{{property | typeName}}{% endif %}{% endif %}{% endmacro %}
+{% macro sub_schema(property) %}{% if (property | schemaModel) %}{% if (property | schemaType) == 'array' %}List<{{(property | schemaModel) | caseUcfirst | overrideIdentifier}}>{% else %}{{(property | schemaModel) | caseUcfirst | overrideIdentifier }}{% endif %}{% else %}{% if (property | schemaType) == 'object' and property.additionalProperties %}Map<String, dynamic>{% else %}{{property | typeName}}{% endif %}{% endif %}{% endmacro %}
 part of '../../models.dart';
 
 /// {{ definition.description }}
-class {{ definition.name | caseUcfirst | overrideIdentifier }} implements Model {
+class {{ definitionName | caseUcfirst | overrideIdentifier }} implements Model {
 {% for property in definition.properties %}
-    /// {{ property.description }}
-    final {% if not property.required %}{{_self.sub_schema(property)}}? {{ property.name | escapeKeyword }}{% else %}{{_self.sub_schema(property)}} {{ property.name | escapeKeyword }}{% endif %};
+  /// {{ property.description | trimLines }}
+  final {% if not (property | schemaRequired) %}{{_self.sub_schema(property)}}? {{ (property | schemaName) | escapeKeyword }}{% else %}{{_self.sub_schema(property)}} {{ (property | schemaName) | escapeKeyword }}{% endif %};
 
 {% endfor %}
-{%~ if definition.additionalProperties %}
-    final Map<String, dynamic> {{ 'data' | escapeKeyword }};
+{% if definition.additionalProperties %}
+  final Map<String, dynamic> {{ 'data' | escapeKeyword }};
 
 {% endif %}
-    {{ definition.name | caseUcfirst | overrideIdentifier}}({% if definition.properties | length or definition.additionalProperties %}{{ '{' }}{% endif %}
-
-{% for property in definition.properties %}
-        {% if property.required %}required {% endif %}this.{{ property.name | escapeKeyword }},
+  {{ definitionName | caseUcfirst | overrideIdentifier }}({% if definition.properties | length or definition.additionalProperties %}{
+{% else %}
+{% endif %}{% for property in definition.properties %}
+    {% if (property | schemaRequired) %}required {% endif %}this.{{ (property | schemaName) | escapeKeyword }},
 {% endfor %}
 {% if definition.additionalProperties %}
-        required this.{{ 'data' | escapeKeyword }},
+    required this.{{ 'data' | escapeKeyword }},
 {% endif %}
-    {% if definition.properties | length or definition.additionalProperties %}{{ '}' }}{% endif %});
-
-    factory {{ definition.name | caseUcfirst | overrideIdentifier}}.fromMap(Map<String, dynamic> map) {
-        return {{ definition.name | caseUcfirst | overrideIdentifier }}(
+{% if definition.properties | length or definition.additionalProperties %}  });
+{% else %});
+{% endif %}
+  factory {{ definitionName | caseUcfirst | overrideIdentifier }}.fromMap(
+    Map<String, dynamic> map,
+  ) {
+    return {{ definitionName | caseUcfirst | overrideIdentifier }}(
 {% for property in definition.properties %}
-            {{ property.name | escapeKeyword }}:{{' '}}
-            {%- if property.sub_schema -%}
-                {%- if property.type == 'array' -%}
-                    List<{{property.sub_schema | caseUcfirst | overrideIdentifier}}>.from(map['{{property.name | escapeDollarSign }}'].map((p) => {{property.sub_schema | caseUcfirst | overrideIdentifier}}.fromMap(p)))
-                {%- else -%}
-                    {{property.sub_schema | caseUcfirst | overrideIdentifier}}.fromMap(map['{{property.name | escapeDollarSign }}'])
-                {%- endif -%}
-            {%- elseif property.enum -%}
-                {%- set enumName = property['enumName'] ?? property.name -%}
-                {%- if property.required -%}
-                enums.{{ enumName | caseUcfirst }}.values.firstWhere((e) => e.value == map['{{property.name | escapeDollarSign }}'])
-                {%- else -%}
-                map['{{property.name | escapeDollarSign }}'] != null ? enums.{{ enumName | caseUcfirst }}.values.firstWhere((e) => e.value == map['{{property.name | escapeDollarSign }}']) : null
-                {%- endif -%}
-            {%- else -%}
-                {%- if property.type == 'array' -%}
-                    List.from(map['{{property.name | escapeDollarSign }}'] ?? [])
-                {%- else -%}
-                    map['{{property.name | escapeDollarSign }}']
-                    {%- if property.type == "number" -%}
-                        {%- if not property.required %}?{% endif %}.toDouble()
-                    {%- endif -%}
-                    {%- if property.type == "string" -%}
-                        {%- if not property.required %}?{% endif %}.toString()
-                    {%- endif -%}
-                {%- endif -%}
-            {%- endif -%},
+{% set propertyName = property | schemaName %}
+{% set modelName = (property | schemaModel) | caseUcfirst | overrideIdentifier %}
+      {{ propertyName | escapeKeyword }}:{% if not (property | schemaModel) and not (property | usesEnumType) and ((((property | schemaType) == 'string' or (property | schemaType) == 'number') and propertyName|length >= 27) or (property | schemaType) == 'array' and propertyName|length >= 25 or propertyName|length > 32) %}{{ "\n" }}          {% else %} {% endif %}{% if (property | schemaModel) %}{% if (property | schemaType) == 'array' %}{% if not (property | schemaRequired) %}map['{{ propertyName | escapeDollarSign }}'] != null
+          ? {% endif %}List<{{ modelName }}>.from(
+{% if not (property | schemaRequired) %}              {% else %}        {% endif %}map['{{ propertyName | escapeDollarSign }}']{% if propertyName|length + modelName|length > 40 %}{{ "\n" }}{% if not (property | schemaRequired) %}                  {% else %}            {% endif %}.map((p) => {{ modelName }}.fromMap(p)){% else %}.map((p) => {{ modelName }}.fromMap(p)){% endif %},
+{% if not (property | schemaRequired) %}            )
+          : null{% else %}      ){% endif %}{% else %}{% if not (property | schemaRequired) %}map['{{ propertyName | escapeDollarSign }}'] != null
+          ? {% endif %}{{ modelName }}.fromMap(
+{% if not (property | schemaRequired) %}              {% else %}        {% endif %}map['{{ propertyName | escapeDollarSign }}'],
+{% if not (property | schemaRequired) %}            )
+          : null{% else %}      ){% endif %}{% endif %}{% elseif property | usesEnumType %}{% set enumName = (property | enumName) %}{% if property | arraySchema %}{% if not (property | schemaRequired) %}map['{{ propertyName | escapeDollarSign }}'] != null
+          ? {% endif %}List<enums.{{ enumName | caseUcfirst }}>.from(
+{% if not (property | schemaRequired) %}              {% else %}        {% endif %}map['{{ propertyName | escapeDollarSign }}'].map(
+{% if not (property | schemaRequired) %}                {% else %}          {% endif %}(p) =>{% if enumName|length > 16 %}{{ "\n" }}{% if not (property | schemaRequired) %}                    {% else %}              {% endif %}{% else %} {% endif %}enums.{{ enumName | caseUcfirst }}.values.firstWhere((e) => e.value == p),
+{% if not (property | schemaRequired) %}              {% else %}        {% endif %}),
+{% if not (property | schemaRequired) %}            )
+          : null{% else %}      ){% endif %}{% elseif property | schemaRequired %}enums.{{ enumName | caseUcfirst }}.values.firstWhere(
+        (e) => e.value == map['{{ propertyName | escapeDollarSign }}'],
+      ){% else %}map['{{ propertyName | escapeDollarSign }}'] != null
+          ? enums.{{ enumName | caseUcfirst }}.values.firstWhere(
+              (e) => e.value == map['{{ propertyName | escapeDollarSign }}'],
+            )
+          : null{% endif %}{% else %}{% if (property | schemaType) == 'array' %}List.from(map['{{ propertyName | escapeDollarSign }}'] ?? []){% else %}map['{{ propertyName | escapeDollarSign }}']{% if (property | schemaType) == "number" %}{% if not (property | schemaRequired) %}?{% endif %}.toDouble(){% endif %}{% if (property | schemaType) == "string" %}{% if not (property | schemaRequired) %}?{% endif %}.toString(){% endif %}{% endif %}{% endif %},
 {% endfor %}
 {% if definition.additionalProperties %}
-            {{ 'data' | escapeKeyword }}: map["{{ 'data' | escapeDollarSign }}"] ?? map,
+      {{ 'data' | escapeKeyword }}: map["{{ 'data' | escapeDollarSign }}"] ?? map,
 {% endif %}
-        );
-    }
+    );
+  }
 
-    @override
-    Map<String, dynamic> toMap() {
-        return {
+  @override
+  Map<String, dynamic> toMap() {
+    return {
 {% for property in definition.properties %}
-            "{{ property.name | escapeDollarSign }}": {{ property | modelToMapValue }},
+{% set propertyName = property | schemaName %}
+      "{{ propertyName | escapeDollarSign }}":{% if propertyName|length > 34 %}{{ "\n" }}          {% else %} {% endif %}{{ property | modelToMapValue(propertyName, property | schemaRequired) }},
 {% endfor %}
 {% if definition.additionalProperties %}
-            "{{ 'data' | escapeDollarSign }}": {{ 'data' | escapeKeyword }},
+      "{{ 'data' | escapeDollarSign }}": {{ 'data' | escapeKeyword }},
 {% endif %}
-        };
-    }
+    };
+  }
 {% if definition.additionalProperties %}
 
-    T convertTo<T>(T Function(Map<String, dynamic>) fromJson) => fromJson({{ 'data' | escapeKeyword }});
+  T convertTo<T>(T Function(Map<String, dynamic>) fromJson) => fromJson({{ 'data' | escapeKeyword }});
 {% endif %}
 {% for property in definition.properties %}
-{% if property.sub_schema %}
-{% for def in spec.definitions %}
-{% if def.name == property.sub_schema and def.additionalProperties and property.type == 'array' %}
+{% if (property | schemaModel) %}
+{% for defName, def in definitions %}
+{% if defName == (property | schemaModel) and def.additionalProperties and (property | schemaType) == 'array' %}
 
-    List<T> convertTo<T>(T Function(Map) fromJson) =>
-        {{property.name}}.map((d) => d.convertTo<T>(fromJson)).toList();
+  List<T> convertTo<T>(T Function(Map) fromJson) =>
+      {{ (property | schemaName) | escapeKeyword }}.map((d) => d.convertTo<T>(fromJson)).toList();
 {% endif %}
 {% endfor %}
 {% endif %}

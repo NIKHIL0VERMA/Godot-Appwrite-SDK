@@ -1,87 +1,98 @@
 <?php
 
-namespace {{ spec.namespace | caseNamespace }}\Services;
+declare(strict_types=1);
 
-use {{ spec.namespace | caseNamespace }}\{{ spec.namespace | split('\\') | last | caseUcfirst}}Exception;
-use {{ spec.namespace | caseNamespace }}\Client;
-use {{ spec.namespace | caseNamespace }}\Service;
-use {{ spec.namespace | caseNamespace }}\InputFile;
+namespace {{ namespace | caseNamespace }}\Services;
+
+use {{ namespace | caseNamespace }}\{{ namespace | split('\\') | last | caseUcfirst}}Exception;
+use {{ namespace | caseNamespace }}\Client;
+use {{ namespace | caseNamespace }}\Service;
 {% set added = [] %}
-{% for method in service.methods %}
-{% for parameter in method.parameters.all %}
-{% if parameter.enumValues is not empty %}
-{% if parameter.enumName not in added %}
-use {{ spec.namespace | caseNamespace }}\Enums\{{ parameter.enumName | caseUcfirst }};
-{% set added = added|merge([parameter.enumName]) %}
+{% set needsPart = false %}
+{% for method in (service | operations) %}
+{% if 'multipart/form-data' in (method | consumes) %}
+{% set needsPart = true %}
+{% endif %}
+{% for parameter in (method | parameters('all')) %}
+{% if (parameter | schemaType) == 'file' and 'InputFile' not in added %}
+use {{ namespace | caseNamespace }}\InputFile;
+{% set added = added|merge(['InputFile']) %}
+{% endif %}
+{% if (parameter | enumValues) is not empty and (parameter | schemaType) != 'array' %}
+{% if (parameter | enumName) not in added %}
+use {{ namespace | caseNamespace }}\Enums\{{ (parameter | enumName) | caseUcfirst }};
+{% set added = added|merge([(parameter | enumName)]) %}
 {% endif %}
 {% endif %}
-{% if parameter.model is not empty and parameter.type != 'array' %}
-{% if parameter.model not in added %}
-use {{ spec.namespace | caseNamespace }}\Models\{{ parameter.model | caseUcfirst | overrideIdentifier }};
-{% set added = added|merge([parameter.model]) %}
+{% if (parameter | schemaModel) is not empty and (parameter | schemaType) != 'array' %}
+{% if (parameter | schemaModel) not in added %}
+use {{ namespace | caseNamespace }}\Models\{{ (parameter | schemaModel) | caseUcfirst | overrideIdentifier }};
+{% set added = added|merge([(parameter | schemaModel)]) %}
 {% endif %}
 {% endif %}
 {% endfor %}
 {% endfor %}
+{% if needsPart %}
+use Utopia\Psr7\Request\Multipart\Part;
+{% endif %}
 
 class {{ service.name | caseUcfirst }} extends Service
 {
-    public function __construct(Client $client)
-    {
-        parent::__construct($client);
-    }
-
 {% set nonDeprecatedMethodNames = [] %}
-{% for method in service.methods %}
+{% for method in (service | operations) %}
 {% if not method.deprecated %}
-{% set nonDeprecatedMethodNames = nonDeprecatedMethodNames|merge([method.name | caseCamel | lower]) %}
+{% set nonDeprecatedMethodNames = nonDeprecatedMethodNames|merge([(method | methodName) | caseCamel | lower]) %}
 {% endif %}
 {% endfor %}
-{% for method in service.methods %}
-{% set methodNameLower = method.name | caseCamel | lower %}
+{% for method in (service | operations) %}
+{% set methodNameLower = (method | methodName) | caseCamel | lower %}
 {% if method.deprecated and methodNameLower in nonDeprecatedMethodNames %}
 {# Skip deprecated methods that have namespace collisions with non-deprecated methods #}
 {% else %}
 {% set deprecated_message = '' %}
     /**
 {% if method.description %}
-{{ method.description | wrap(75, '     * ') }}
+{{ method.description | split('\n') | map(line => line | trim) | join('\n') | trim | wrap(75, '     * ') | replace({'     * \n': '     *\n'}) | raw }}
      *
 {% endif %}
-{% for parameter in method.parameters.all %}
-     * @param {% if not parameter.required or parameter.nullable %}?{% endif %}{{ parameter | typeName }} ${{ parameter.name | caseCamel | escapeKeyword }}
-{% endfor %}
-     * @throws {{ spec.namespace | split('\\') | last | caseUcfirst}}Exception
-     * @return {{ method | getReturn(spec) }}
+     * @throws {{ namespace | split('\\') | last | caseUcfirst}}Exception
 {% if method.deprecated %}
      *
-{%~ if method.since and method.replaceWith %}
-     * @deprecated This API has been deprecated since {{ method.since }}. Please use `{{ method.replaceWith | split('.') | last | caseCamel }}` instead.
+{%~ if (method | appwrite('deprecated', {})['since'] ?? '') and (method | appwrite('deprecated', {})['replaceWith'] ?? '') %}
+     * @deprecated This API has been deprecated since {{ (method | appwrite('deprecated', {})['since'] ?? '') }}. Please use `{{ (method | appwrite('deprecated', {})['replaceWith'] ?? '') | split('.') | last | caseCamel }}` instead.
 {%~ else %}
      * @deprecated This API has been deprecated.
 {%~ endif %}
-{% if method.replaceWith %}
-     * @see {{ method.replaceWith | replace({'.': '::'}) | capitalizeFirst }}
+{% if (method | appwrite('deprecated', {})['replaceWith'] ?? '') %}
+     * @see {{ (method | appwrite('deprecated', {})['replaceWith'] ?? '') | replace({'.': '::'}) | capitalizeFirst }}
 {% endif %}
 {% endif %}
      */
-    public function {{ method.name | caseCamel }}({{ method | methodParameters }}): {{ method | getReturn(spec) }}
+    public function {{ (method | methodName) | caseCamel }}({{ method | methodParameters }}): {{ method | getReturn(spec) }}
     {
+{% for parameter in (method | parameters('path')) %}
+{% if parameter.required and (parameter.extensions['x-sdk-source']|default('')) != 'security' and (parameter | schemaType) == 'string' and not (parameter | usesEnumType) %}
+        if (${{ parameter.name | caseCamel | escapeKeyword }} === '') {
+            throw new {{ namespace | split('\\') | last | caseUcfirst}}Exception('Missing required parameter: "{{ parameter.name | caseCamel }}"');
+        }
+
+{% endif %}
+{% endfor %}
         $apiPath = str_replace(
-            [{% for parameter in method.parameters.path %}'{{ '{' }}{{ parameter.name }}{{ '}' }}'{% if not loop.last %}, {% endif %}{% endfor %}],
-            [{% for parameter in method.parameters.path %}{% if parameter.source|default('') == 'security' %}$this->client->getConfig('{{ parameter.config | caseLower }}'){% else %}${{ parameter.name | caseCamel | escapeKeyword }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}],
+            [{% for parameter in (method | parameters('path')) %}'{{ '{' }}{{ parameter.name }}{{ '}' }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+            [{% for parameter in (method | parameters('path')) %}{% if (parameter.extensions['x-sdk-source']|default('')) == 'security' %}$this->client->getConfig('{{ parameter.extensions['x-sdk-config'] | caseLower }}'){% else %}{% if parameter | usesEnumType %}(string) {% endif %}${{ parameter.name | caseCamel | escapeKeyword }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}],
             '{{ method.path }}'
         );
-        {%~ for security in method.securityQueries %}
+        {%~ for security in (method | securityQueries) %}
         $apiPath .= '{% if loop.first %}?{% else %}&{% endif %}{{ security.name }}=' . urlencode($this->client->getConfig('{{ security.name | caseLower }}'));
         {%~ endfor %}
 
         {{~ include('php/base/params.twig') -}}
-        {%~ if 'multipart/form-data' in method.consumes %}
-        {{~ include('php/base/requests/file.twig') }}
+        {%~ if 'multipart/form-data' in (method | consumes) %}
+        {{~ include('php/base/requests/file.twig') -}}
         {%~ else %}
 
-        {{~ include('php/base/requests/api.twig') }}
+        {{~ include('php/base/requests/api.twig') -}}
         {%~ endif %}
     }
         {%~ if not loop.last %}

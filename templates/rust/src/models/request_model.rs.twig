@@ -1,50 +1,55 @@
-//! {{ requestModel.name | caseUcfirst }} request model for {{ spec.title }} SDK
+//! {{ requestModelName | caseUcfirst }} request model for {{ spec.info.title }} SDK
 
 use serde::{Deserialize, Serialize};
-{% set fieldNames = {} %}
 
 {{ requestModel.description | rustdocComment }}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(test, derive(Default))]
-pub struct {{ requestModel.name | caseUcfirst | overrideIdentifier }} {
+pub struct {{ requestModelName | caseUcfirst | overrideIdentifier }} {
 {% for property in requestModel.properties %}
-{% set propertyName = property.name %}
+{% set propertyName = (property | schemaName) %}
 {% set fieldName = propertyName matches '/^_?[A-Z_]+$/' ? propertyName | lower | trim('_') : propertyName | caseSnake %}
 {% set fieldName = fieldName | overrideIdentifier %}
     {{ property.description | rustdocComment(4) }}
-    #[serde(rename = "{{ property.name }}")]
-{% if property.required %}
+    #[serde(rename = "{{ (property | schemaName) }}")]
+{% if (property | schemaRequired) and not (property | schemaNullable) %}
     pub {{ fieldName }}: {{ property | propertyType(spec) | rustType }},
 {% else %}
+{% if not (property | schemaRequired) %}
     #[serde(skip_serializing_if = "Option::is_none")]
+{% else %}
+    #[serde(deserialize_with = "Option::deserialize")]
+{% endif %}
     pub {{ fieldName }}: Option<{{ property | propertyType(spec) | rustType }}>,
 {% endif %}
 {% endfor %}
 }
 
-impl {{ requestModel.name | caseUcfirst | overrideIdentifier }} {
+impl {{ requestModelName | caseUcfirst | overrideIdentifier }} {
 {% for property in requestModel.properties %}
-{% set propertyName = property.name %}
+{% set propertyName = (property | schemaName) %}
 {% set fieldName = propertyName matches '/^_?[A-Z_]+$/' ? propertyName | lower | trim('_') : propertyName | caseSnake %}
 {% set fieldName = fieldName | overrideIdentifier %}
-{% if not property.required %}
+{% if not loop.first %}
+
+{% endif %}
+{% if not (property | schemaRequired) or (property | schemaNullable) %}
     /// Set {{ fieldName }}
-    pub fn set_{{ fieldName }}(mut self, {{ fieldName }}: {{ property | propertyType(spec) | rustType }}) -> Self {
-        self.{{ fieldName }} = Some({{ fieldName }});
+{{ [ 'mut self', fieldName ~ ': ' ~ (property | propertyType(spec) | rustType) ] | rustfmtFn(4, 'pub fn set_' ~ fieldName, 'Self') }}
+{{ ('Some(' ~ fieldName ~ ')') | rustfmtAssign(8, 'self.' ~ fieldName) }}
         self
     }
 
     /// Get {{ fieldName }}
-    pub fn {{ fieldName }}(&self) -> Option<&{{ property | propertyType(spec) | rustType }}> {
-        self.{{ fieldName }}.as_ref()
+{{ [ '&self' ] | rustfmtFn(4, 'pub fn ' ~ fieldName, 'Option<&' ~ (property | propertyType(spec) | rustType) ~ '>') }}
+{{ ('.as_ref()') | rustfmtChain(8, 'self.' ~ fieldName) }}
     }
 {% else %}
     /// Get {{ fieldName }}
-    pub fn {{ fieldName }}(&self) -> &{{ property | propertyType(spec) | rustType }} {
+{{ [ '&self' ] | rustfmtFn(4, 'pub fn ' ~ fieldName, '&' ~ (property | propertyType(spec) | rustType)) }}
         &self.{{ fieldName }}
     }
 {% endif %}
-
 {% endfor %}
 }
 
@@ -53,11 +58,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_{{ requestModel.name | caseSnake }}_creation() {
-        let _model = <{{ requestModel.name | caseUcfirst | overrideIdentifier }} as Default>::default();
+    fn test_{{ requestModelName | caseSnake }}_creation() {
+        let _model = <{{ requestModelName | caseUcfirst | overrideIdentifier }} as Default>::default();
 {% for property in requestModel.properties %}
-{% if property.required %}
-{% set propertyName = property.name %}
+{% if (property | schemaRequired) %}
+{% set propertyName = (property | schemaName) %}
 {% set fieldName = propertyName matches '/^_?[A-Z_]+$/' ? propertyName | lower | trim('_') : propertyName | caseSnake %}
 {% set fieldName = fieldName | overrideIdentifier %}
         let _ = _model.{{ fieldName }}();
@@ -66,12 +71,12 @@ mod tests {
     }
 
     #[test]
-    fn test_{{ requestModel.name | caseSnake }}_serialization() {
-        let model = <{{ requestModel.name | caseUcfirst | overrideIdentifier }} as Default>::default();
+    fn test_{{ requestModelName | caseSnake }}_serialization() {
+        let model = <{{ requestModelName | caseUcfirst | overrideIdentifier }} as Default>::default();
         let json = serde_json::to_string(&model);
         assert!(json.is_ok());
 
-        let deserialized: Result<{{ requestModel.name | caseUcfirst | overrideIdentifier }}, _> = serde_json::from_str(&json.unwrap());
+{{ ('serde_json::from_str(&json.unwrap())') | rustfmtAssign(8, 'let deserialized: Result<' ~ (requestModelName | caseUcfirst | overrideIdentifier) ~ ', _>') }}
         assert!(deserialized.is_ok());
     }
 }

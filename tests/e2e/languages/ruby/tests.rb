@@ -6,6 +6,7 @@ include Appwrite::Enums
 client = Client.new
 client.set_self_signed(true)
 client.add_header('Origin', 'http://localhost')
+client.set_project('console')
 
 foo = Foo.new(client)
 bar = Bar.new(client)
@@ -55,6 +56,16 @@ puts response.result
 response = general.redirect()
 puts response["result"]
 
+[['', '0'], ['0', '']].each do |id, plain|
+    begin
+        general.validate_path(id: id, plain: plain)
+        raise 'Empty path parameter was accepted'
+    rescue Appwrite::Exception => error
+        puts error.message
+    end
+end
+puts general.validate_path(id: '0', plain: '0').result
+
 begin
     response = general.upload(x: 'string', y: 123, z:['string in array'], file: InputFile.from_path('./tests/resources/file.png'))
     puts response.result
@@ -84,6 +95,8 @@ begin
 rescue => e
     puts e
 end
+
+puts general.download.body
 
 response = general.enum(mock_type: MockType::FIRST)
 puts response.result
@@ -185,6 +198,9 @@ puts Query.distance_greater_than("location", [40.7128, -74], 1000)
 puts Query.distance_greater_than("location", [40.7128, -74], 1000, true)
 puts Query.distance_less_than("location", [40.7128, -74], 1000)
 puts Query.distance_less_than("location", [40.7128, -74], 1000, true)
+puts Query.vector_dot("embedding", [0.1, 0.2, 0.3])
+puts Query.vector_cosine("embedding", [0.1, 0.2, 0.3])
+puts Query.vector_euclidean("embedding", [0.1, 0.2, 0.3])
 
 # Spatial query tests
 puts Query.intersects("location", [40.7128, -74])

@@ -11,11 +11,10 @@ jobs:
     name: ${{ matrix.sdk }} (${{ matrix.platform }})
     runs-on: ubuntu-latest
     env:
-      # Bun 1.3.12 has a sig_size calculation bug in macho.zig that truncates the
-      # LC_CODE_SIGNATURE blob on cross-compiled Darwin binaries (oven-sh/bun#29120).
-      # Unpin once a Bun release includes the upstream fix (oven-sh/bun#29122).
-      CLI_BUN_VERSION: '1.3.11'
       FLUTTER_VERSION: '3.35.7'
+      KTLINT_VERSION: '1.8.0'
+      KTLINT_SHA256: 'a3fd620207d5c40da6ca789b95e7f823c54e854b7fade7f613e91096a3706d75'
+      RUBOCOP_VERSION: '1.90.0'
       OSV_SCANNER_VERSION: 'v2.3.1'
     strategy:
       fail-fast: false
@@ -65,6 +64,9 @@ jobs:
           - sdk: dotnet
             platform: server
 
+          - sdk: unity
+            platform: client
+
           - sdk: kotlin
             platform: server
 
@@ -74,21 +76,25 @@ jobs:
           - sdk: gdscript
             platform: server
 
+          # Tooling targets
+          - sdk: zed-extension
+            platform: console
+
           # Console SDKs
           - sdk: cli
             platform: console
-          
+
           - sdk: web
             platform: console
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # 2.37.0
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: '8.5'
           extensions: curl
@@ -99,22 +105,31 @@ jobs:
       - name: Generate SDK for ${{ matrix.sdk }}
         run: php example.php ${{ matrix.sdk }} ${{ matrix.platform }}
 
+      - name: Verify generated SDK is idempotent
+        if: matrix.sdk == 'zed-extension' || matrix.sdk == 'cli'
+        run: |
+          checksums() {
+            find examples/${{ matrix.sdk }} -type f -print0 \
+              | sort -z \
+              | xargs -0 sha256sum
+          }
+
+          checksums > /tmp/${{ matrix.sdk }}-checksums
+
+          php example.php ${{ matrix.sdk }} ${{ matrix.platform }}
+
+          checksums | diff -u /tmp/${{ matrix.sdk }}-checksums -
+
       # Language-specific setup
       - name: Setup Node.js
         if: matrix.sdk == 'web' || matrix.sdk == 'node' || matrix.sdk == 'react-native' || matrix.sdk == 'cli'
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
 
-      - name: Setup Bun
-        if: matrix.sdk == 'cli'
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: ${{ env.CLI_BUN_VERSION }}
-
       - name: Cache Flutter SDK
         if: matrix.sdk == 'flutter'
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.tool_cache }}/flutter
           key: ${{ runner.os }}-flutter-${{ env.FLUTTER_VERSION }}
@@ -133,27 +148,37 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y wget
-          wget https://download.swift.org/swift-6.0.3-release/ubuntu2204/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE-ubuntu22.04.tar.gz
-          tar xzf swift-6.0.3-RELEASE-ubuntu22.04.tar.gz
-          sudo mv swift-6.0.3-RELEASE-ubuntu22.04 /usr/share/swift
+          wget https://download.swift.org/swift-6.1.3-release/ubuntu2204/swift-6.1.3-RELEASE/swift-6.1.3-RELEASE-ubuntu22.04.tar.gz
+          tar xzf swift-6.1.3-RELEASE-ubuntu22.04.tar.gz
+          sudo mv swift-6.1.3-RELEASE-ubuntu22.04 /usr/share/swift
           echo "/usr/share/swift/usr/bin" >> $GITHUB_PATH
 
       - name: Setup Java
         if: matrix.sdk == 'android' || matrix.sdk == 'kotlin'
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
         with:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Setup ktlint
+        if: matrix.sdk == 'android' || matrix.sdk == 'kotlin'
+        run: |
+          curl --fail --location --silent --show-error \
+            --output /tmp/ktlint \
+            "https://github.com/pinterest/ktlint/releases/download/${KTLINT_VERSION}/ktlint"
+          echo "${KTLINT_SHA256}  /tmp/ktlint" | sha256sum --check
+          chmod +x /tmp/ktlint
+          /tmp/ktlint --version
+
       - name: Setup Python
         if: matrix.sdk == 'python'
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11'
 
       - name: Setup Ruby
         if: matrix.sdk == 'ruby'
-        uses: ruby/setup-ruby@c4e5b1316158f92e3d49443a9d58b31d25ac0f8f # v1.306.0
+        uses: ruby/setup-ruby@a30dfa457ad68707b8b910ac3a244714b61c0626 # v1.320.0
         with:
           ruby-version: '3.1'
 
@@ -164,10 +189,10 @@ jobs:
           sdk: 'stable'
 
       - name: Setup Go
-        if: matrix.sdk == 'go' || matrix.sdk == 'dart' || matrix.sdk == 'flutter'
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        if: matrix.sdk == 'go' || matrix.sdk == 'cli' || matrix.sdk == 'dart' || matrix.sdk == 'flutter'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.11'
+          go-version: '1.26.6'
 
       - name: Setup GDScript
         if: matrix.sdk == 'godot' || matrix.sdk == 'gdscript'
@@ -182,14 +207,20 @@ jobs:
         run: go install github.com/google/osv-scanner/v2/cmd/osv-scanner@${{ env.OSV_SCANNER_VERSION }}
 
       - name: Setup .NET
-        if: matrix.sdk == 'dotnet'
-        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        if: matrix.sdk == 'dotnet' || matrix.sdk == 'unity'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '8.0.x'
 
       - name: Setup Rust
         if: matrix.sdk == 'rust'
         uses: dtolnay/rust-toolchain@bd41891a8e7f4b8649f6d684415e1a6155fe4e22 # 1.83.0
+        with:
+          components: rustfmt
+
+      - name: Setup Rust for Zed extension
+        if: matrix.sdk == 'zed-extension'
+        run: rustup toolchain install 1.86.0 --profile minimal --no-self-update --component rustfmt --target wasm32-wasip1
 
       - name: Setup Rust for cargo-audit
         if: matrix.sdk == 'rust'
@@ -197,7 +228,7 @@ jobs:
 
       - name: Cache cargo-audit
         if: matrix.sdk == 'rust'
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/bin/cargo-audit
@@ -221,25 +252,30 @@ jobs:
             web)
               npm ci
               npm audit
+              npm run format:check
+              npm run lint
+              npm run analyse
               npm run build
               ;;
             cli)
-              bun install
-              bun run linux-x64
-              bun run linux-arm64
-              bun run mac-x64
-              bun run mac-arm64
-              bun run windows-x64
-              bun run windows-arm64
-
-              npm ci
-              npm audit
-              npm run build
-              node dist/cli.cjs --help
+              go mod tidy
+              unformatted=$(gofmt -l .)
+              if [ -n "$unformatted" ]; then
+                echo "Not gofmt-clean:"
+                echo "$unformatted"
+                exit 1
+              fi
+              go build ./...
+              go vet ./...
+              go test -race ./...
+              go build -o appwrite .
               ;;
             react-native)
-              npm ci
-              npm audit
+              npm ci --omit=peer
+              npm audit --omit=peer
+              npm run format:check
+              npm run lint
+              npm run analyse
               npm run build
               ;;
             flutter)
@@ -249,18 +285,35 @@ jobs:
               flutter test
               ;;
             apple|swift)
+              if [ ! -f .swift-format ]; then
+                echo "Generated SDK is missing .swift-format"
+                exit 1
+              fi
+              if command -v swift-format >/dev/null; then
+                swift-format lint --recursive --strict --parallel --configuration .swift-format .
+              elif swift format --help >/dev/null 2>&1; then
+                swift format lint --recursive --strict --parallel --configuration .swift-format .
+              else
+                echo "swift-format is not on PATH"
+                exit 1
+              fi
               swift build
               ;;
             android)
+              /tmp/ktlint '**/*.kt' '**/*.kts'
               chmod +x ./gradlew || true
               ./gradlew build -x lint
               ;;
             kotlin)
+              /tmp/ktlint '**/*.kt' '**/*.kts'
               chmod +x ./gradlew || true
               ./gradlew build
               ;;
             php)
               composer install
+              composer lint
+              composer analyse
+              composer refactor
               composer audit
               composer test
               ;;
@@ -268,6 +321,8 @@ jobs:
               python -m pip install pip-audit
               pip install -e .[test]
               pip-audit --strict .
+              find appwrite test -name '*.py' -print0 | xargs -0 python -m black --check
+              python -m black --check setup.py
               python -m compileall appwrite/
               python -m unittest
               ;;
@@ -276,10 +331,20 @@ jobs:
               gem install bundler-audit
               bundle-audit update
               bundle-audit check --no-update
+              if [ ! -f .rubocop.yml ]; then
+                echo "Generated SDK is missing .rubocop.yml"
+                exit 1
+              fi
+              gem install rubocop --version "${RUBOCOP_VERSION}"
+              rubocop --version
+              rubocop
               ;;
             node)
               npm ci
               npm audit
+              npm run format:check
+              npm run lint
+              npm run analyse
               npm run build
               npm run test
               ;;
@@ -290,15 +355,34 @@ jobs:
               ;;
             go)
               go mod tidy || true
+              unformatted=$(gofmt -l .)
+              if [ -n "$unformatted" ]; then
+                echo "Not gofmt-clean:"
+                echo "$unformatted"
+                exit 1
+              fi
               go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
               govulncheck ./...
               go build ./...
               go test ./...
+              ../../scripts/validate-go-examples.sh .
               ;;
             dotnet)
+              if [ ! -f .editorconfig ]; then
+                echo "Generated SDK is missing .editorconfig"
+                exit 1
+              fi
+              dotnet format whitespace --folder --verify-no-changes
               dotnet restore
               dotnet build --no-restore
               dotnet test --no-build
+              ;;
+            unity)
+              if [ ! -f .editorconfig ]; then
+                echo "Generated SDK is missing .editorconfig"
+                exit 1
+              fi
+              dotnet format whitespace --folder --verify-no-changes
               ;;
             rust)
               cargo generate-lockfile
@@ -306,12 +390,16 @@ jobs:
                 cargo +1.85.0 install cargo-audit --version 0.22.1 --locked
               fi
               cargo audit
+              cargo +1.83.0 fmt --check --all
               cargo +1.83.0 build --release
               cargo +1.83.0 test --lib
               ;;
             gdscript|godot)
               godot --headless --import --quit
               godot --headless --path . -s addons/gut/gut_cmdln.gd -gdir=res://tests -gexit
+            zed-extension)
+              cargo +1.86.0 fmt --check
+              cargo +1.86.0 check --target wasm32-wasip1
               ;;
             *)
               echo "Unknown SDK: ${{ matrix.sdk }}"
@@ -319,13 +407,53 @@ jobs:
               ;;
           esac
 
-      - name: Verify CLI Darwin binaries include valid embedded code signatures
+      - name: Test compiled CLI binary
         if: matrix.sdk == 'cli'
         working-directory: examples/cli
-        run: python3 ../../scripts/verify-darwin-signatures.py
+        run: |
+          ./appwrite --version
+          ./appwrite --help | grep -q "USAGE"
+          ./appwrite --help | grep -q "GET STARTED"
+          SHELL=bash ./appwrite completion bash >/dev/null
+
+      # The CLI ships as a native binary behind an npm launcher, so it has no
+      # dist/ entry points to check -- what can break is the launcher itself
+      # and the two scripts that assemble the platform packages.
+      - name: Verify CLI npm launcher
+        if: matrix.sdk == 'cli'
+        working-directory: examples/cli
+        run: |
+          node --check npm/run.js
+          node --check scripts/build-npm-packages.mjs
+          node --check scripts/stage-assets.mjs
+
+          node -e "
+            const pkg = require('./npm/package.json');
+            const commands = Object.keys(pkg.bin ?? {});
+            if (commands.length !== 1 || pkg.bin[commands[0]] !== 'run.js') {
+              console.error('ERROR: npm/package.json must map exactly one bin command to run.js');
+              process.exit(1);
+            }
+            if (!(pkg.files ?? []).includes('run.js')) {
+              console.error('ERROR: npm/package.json files must include run.js or the launcher is not published');
+              process.exit(1);
+            }
+            if (!pkg.license) {
+              console.error('ERROR: npm/package.json is missing a license');
+              process.exit(1);
+            }
+            for (const [name, version] of Object.entries(pkg.optionalDependencies ?? {})) {
+              if (version !== pkg.version) {
+                console.error(\`ERROR: \${name} is pinned to \${version}, not the launcher version \${pkg.version}\`);
+                process.exit(1);
+              }
+            }
+          "
+
+          (cd npm && npm pack --dry-run)
 
       - name: Verify npm package entry points
-        if: matrix.sdk == 'web' || matrix.sdk == 'node' || matrix.sdk == 'react-native' || matrix.sdk == 'cli'
+        if: matrix.sdk == 'web' || matrix.sdk == 'node' || matrix.sdk == 'react-native'
         working-directory: examples/${{ matrix.sdk }}
         run: |
           echo "::group::Checking package.json has files field"
@@ -377,3 +505,84 @@ jobs:
           fi
           echo "All entry points verified."
           echo "::endgroup::"
+
+  validate-tooling-plugins:
+    name: Tooling plugins
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.5'
+          extensions: curl
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+
+      - name: Install Composer Dependencies
+        run: composer install
+
+      - name: Regenerate tooling plugins
+        run: |
+          php example.php cursor-plugin
+          php example.php claude-plugin
+          php example.php codex-plugin
+
+      - name: Verify tooling plugin generation is idempotent
+        run: |
+          find examples/cursor-plugin examples/claude-plugin examples/codex-plugin -type f -print0 \
+            | sort -z \
+            | xargs -0 sha256sum > /tmp/tooling-plugin-checksums
+
+          php example.php cursor-plugin
+          php example.php claude-plugin
+          php example.php codex-plugin
+
+          find examples/cursor-plugin examples/claude-plugin examples/codex-plugin -type f -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            | diff -u /tmp/tooling-plugin-checksums -
+
+      - name: Validate hosted MCP configurations
+        run: |
+          python3 <<'PY'
+          import json
+          import pathlib
+          import tomllib
+
+          root = pathlib.Path("examples")
+          expected_url = "https://mcp.appwrite.io/"
+
+          cursor = json.loads((root / "cursor-plugin/.mcp.json").read_text())
+          assert cursor["mcpServers"] == {
+              "appwrite": {"url": expected_url},
+          }
+
+          claude = json.loads((root / "claude-plugin/.mcp.json").read_text())
+          assert claude["mcpServers"] == {
+              "appwrite": {"type": "http", "url": expected_url},
+          }
+          claude_manifest = json.loads(
+              (root / "claude-plugin/.claude-plugin/plugin.json").read_text()
+          )
+          assert "userConfig" not in claude_manifest
+
+          codex = json.loads(
+              (root / "codex-plugin/plugins/appwrite/.mcp.json").read_text()
+          )
+          assert codex["mcpServers"] == {
+              "appwrite": {"type": "http", "url": expected_url},
+          }
+          codex_config = tomllib.loads(
+              (root / "codex-plugin/plugins/appwrite/config.toml").read_text()
+          )
+          assert codex_config["mcp_servers"] == {
+              "appwrite": {"url": expected_url},
+          }
+          PY

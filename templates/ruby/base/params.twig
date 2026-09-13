@@ -1,33 +1,46 @@
-            api_path = '{{ method.path }}'
-{% for parameter in method.parameters.path %}
-                .gsub('{{ '{' }}{{ parameter.name }}{{ '}' }}', {% if parameter.source|default('') == 'security' %}@client.get_config('{{ parameter.config | caseLower }}'){% else %}{{ parameter.name | caseSnake | escapeKeyword }}{% endif %})
-{% endfor %}
-            {%~ for security in method.securityQueries %}
-            api_path += '{% if loop.first %}?{% else %}&{% endif %}{{ security.name }}=' + URI.encode_www_form_component(@client.get_config('{{ security.name | caseLower }}'))
-            {%~ endfor %}
-
-{% for parameter in method.parameters.all %}
+{% for parameter in (method | parameters('all')) %}
 {% if parameter.required %}
-            if {{ parameter.name | caseSnake | escapeKeyword }}.nil?
-              raise {{spec.title | caseUcfirst}}::Exception.new('Missing required parameter: "{{ parameter.name | caseCamel | escapeKeyword }}"')
+{# An empty string would vanish into the path and address a different endpoint, so a required string path parameter rejects it too. #}
+{% set rejectEmpty = parameter.location.value == 'path' and (parameter | schemaType) == 'string' and not (parameter | usesEnumType) %}
+            if {{ parameter.name | caseSnake | escapeKeyword }}.nil?{% if rejectEmpty %} || {{ parameter.name | caseSnake | escapeKeyword }} == ''{% endif %}
+
+                raise {{spec.info.title | caseUcfirst}}::Exception.new('Missing required parameter: "{{ parameter.name | caseCamel | escapeKeyword }}"')
             end
 
 {% endif %}
 {% endfor %}
+            api_path = '{{ method.path }}'
+{% for parameter in (method | parameters('path')) %}
+                .gsub('{{ '{' }}{{ parameter.name }}{{ '}' }}', {% if (parameter.extensions['x-sdk-source']|default('')) == 'security' %}@client.get_config('{{ parameter.extensions['x-sdk-config'] | caseLower }}'){% else %}{{ parameter.name | caseSnake | escapeKeyword }}{% endif %})
+{% endfor %}
+            {%~ for security in (method | securityQueries) %}
+            api_path += '{% if loop.first %}?{% else %}&{% endif %}{{ security.name }}=' + URI.encode_www_form_component(@client.get_config('{{ security.name | caseLower }}'))
+            {%~ endfor %}
+
+{% set requestParams = (method | parameters('query')) | merge((method | parameters('body'))) %}
+{% if requestParams | length == 0 %}
+            api_params = {}
+{% else %}
             api_params = {
-{% for parameter in method.parameters.query | merge(method.parameters.body)  %}
+{% for parameter in requestParams %}
                 {{ parameter.name }}: {{ parameter.name | caseSnake | escapeKeyword }},
 {% endfor %}
             }
-            
+{% endif %}
+
+{% set headerEntries = (method | securityHeaders) | length + (method | parameters('header')) | length + (method | methodHeaders) | length %}
+{% if headerEntries == 0 %}
+            api_headers = {}
+{% else %}
             api_headers = {
-            {%~ for key, security in method.securityHeaders %}
+            {%~ for key, security in (method | securityHeaders) %}
                 "{{ security.name }}": @client.get_config('{{ key | caseLower }}'),
             {%~ endfor %}
-{% for parameter in method.parameters.header %}
+{% for parameter in (method | parameters('header')) %}
                 "{{ parameter.name }}": {{ parameter.name | caseCamel | escapeKeyword }},
 {% endfor %}
-{% for key, header in method.headers %}
+{% for key, header in (method | methodHeaders) %}
                 "{{ key }}": '{{ header }}',
 {% endfor %}
             }
+{% endif %}

@@ -1,7 +1,8 @@
-            string? idParamName = {% if method.parameters.all | filter(p => p.isUploadID) | length > 0 %}{% for parameter in method.parameters.all | filter(parameter => parameter.isUploadID) %}"{{ parameter.name }}"{% endfor %}{% else %}null{% endif %};
+{% set uploadIdParameter = method | uploadIdParameter %}
+            string? idParamName = {% if uploadIdParameter %}"{{ uploadIdParameter.name }}"{% else %}null{% endif %};
 
-            {%~ for parameter in method.parameters.all %}
-            {%~ if parameter.type == 'file' %}
+            {%~ for parameter in (method | parameters('all')) %}
+            {%~ if (parameter | schemaType) == 'file' %}
             var paramName = "{{ parameter.name }}";
             {%~ endif %}
             {%~ endfor %}
@@ -10,7 +11,7 @@
                 apiPath,
                 apiHeaders,
                 apiParameters,
-                {%~ if method.responseModel %}
+                {%~ if (method | responseModel) %}
                 Convert,
                 {%~ endif %}
                 paramName,

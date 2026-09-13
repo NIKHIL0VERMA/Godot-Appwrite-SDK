@@ -1,25 +1,10 @@
 <?php
 
+use Appwrite\Models\UnionStub;
+use Appwrite\Models\UnionMock;
 use Appwrite\Models\ArraySerializable;
 
-include __DIR__ . '/../../sdks/php/src/Appwrite/Client.php';
-include __DIR__ . '/../../sdks/php/src/Appwrite/Service.php';
-include __DIR__ . '/../../sdks/php/src/Appwrite/InputFile.php';
-include __DIR__ . '/../../sdks/php/src/Appwrite/Query.php';
-include __DIR__ . '/../../sdks/php/src/Appwrite/Permission.php';
-include __DIR__ . '/../../sdks/php/src/Appwrite/Role.php';
-include __DIR__ . '/../../sdks/php/src/Appwrite/ID.php';
-include __DIR__ . '/../../sdks/php/src/Appwrite/Operator.php';
-include __DIR__ . '/../../sdks/php/src/Appwrite/AppwriteException.php';
-foreach (glob(__DIR__ . '/../../sdks/php/src/Appwrite/Enums/*.php') as $file) {
-    include $file;
-}
-foreach (glob(__DIR__ . '/../../sdks/php/src/Appwrite/Models/*.php') as $file) {
-    include $file;
-}
-foreach (glob(__DIR__ . '/../../sdks/php/src/Appwrite/Services/*.php') as $file) {
-    include $file;
-}
+include __DIR__ . '/../../sdks/php/vendor/autoload.php';
 
 use Appwrite\AppwriteException;
 use Appwrite\Models\Player;
@@ -139,6 +124,7 @@ readonly class AdditionalPropsMapped
 
 $client = new Client()
     ->addHeader("Origin", "http://localhost")
+    ->setProject('console')
     ->setSelfSigned();
 
 $foo = new Foo($client);
@@ -186,12 +172,46 @@ echo $response->result . "\n";
 $response = $general->redirect();
 echo $response['result'] . "\n";
 
+foreach ([['', '0'], ['0', '']] as [$id, $plain]) {
+    try {
+        $general->validatePath($plain, $id);
+        throw new RuntimeException('Empty path parameter was accepted');
+    } catch (AppwriteException $error) {
+        echo $error->getMessage() . "\n";
+    }
+}
+echo $general->validatePath('0', '0')->result . "\n";
+
 $response = $general->getUnion();
 echo $response->result . "\n";
 
 $response = $general->getUnion('stub');
 echo $response->data . "\n";
 echo $response->type . "\n";
+
+$response = $general->getCompound('stub');
+if (!$response instanceof UnionStub || $response->data !== 'compound-stub') {
+    throw new RuntimeException('Compound response did not select the specialized model.');
+}
+echo "compound specialization: passed\n";
+
+foreach (['mock', 'unknown', 'null'] as $scenario) {
+    $response = $general->getCompound($scenario);
+    if (!$response instanceof UnionMock || $response->result !== 'compound-mock') {
+        throw new RuntimeException('Compound response did not retain its broad fallback.');
+    }
+}
+echo "compound fallback: passed\n";
+
+foreach (['boolean', 'missing'] as $scenario) {
+    try {
+        $general->getCompound($scenario);
+        throw new RuntimeException('Invalid compound response selected a model.');
+    } catch (UnexpectedValueException) {
+        // Missing or incorrectly typed selection fields must not match.
+    }
+}
+echo "compound invalid response: passed\n";
 
 $data = file_get_contents(__DIR__ . '/../../../resources/file.png');
 $response = $general->upload('string', 123, ['string in array'], InputFile::withData($data, 'image/png', 'file.png'));
@@ -201,11 +221,13 @@ $data = file_get_contents(__DIR__ . '/../../../resources/large_file.mp4');
 $response = $general->upload('string', 123, ['string in array'], InputFile::withData($data, 'video/mp4', 'large_file.mp4'));
 echo $response->result . "\n";
 
-$response = $general->upload('string', 123, ['string in array'], InputFile::withPath(__DIR__ .'/../../../resources/file.png'));
+$response = $general->upload('string', 123, ['string in array'], InputFile::withPath(__DIR__ . '/../../../resources/file.png'));
 echo $response->result . "\n";
 
-$response = $general->upload('string', 123, ['string in array'], InputFile::withPath(__DIR__ .'/../../../resources/large_file.mp4'));
+$response = $general->upload('string', 123, ['string in array'], InputFile::withPath(__DIR__ . '/../../../resources/large_file.mp4'));
 echo $response->result . "\n";
+
+echo $general->download() . "\n";
 
 $response = $general->enum(MockType::FIRST());
 echo $response->result . "\n";
@@ -309,6 +331,9 @@ echo Query::distanceGreaterThan('location', [40.7128, -74], 1000) . "\n";
 echo Query::distanceGreaterThan('location', [40.7128, -74], 1000, true) . "\n";
 echo Query::distanceLessThan('location', [40.7128, -74], 1000) . "\n";
 echo Query::distanceLessThan('location', [40.7128, -74], 1000, true) . "\n";
+echo Query::vectorDot('embedding', [0.1, 0.2, 0.3]) . "\n";
+echo Query::vectorCosine('embedding', [0.1, 0.2, 0.3]) . "\n";
+echo Query::vectorEuclidean('embedding', [0.1, 0.2, 0.3]) . "\n";
 
 // Spatial query tests
 echo Query::intersects('location', [40.7128, -74]) . "\n";

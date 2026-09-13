@@ -2,12 +2,33 @@
 
 namespace Appwrite\SDK\Language;
 
+use Utopia\OpenAPI\Model\ArraySchema;
+use Utopia\OpenAPI\Model\Parameter;
+use Utopia\OpenAPI\Model\ParameterLocation;
+use Utopia\OpenAPI\Model\Schema;
+use Utopia\OpenAPI\Model\StringSchema;
+use Utopia\OpenAPI\Specification;
 use Override;
 use Appwrite\SDK\Language;
 use Twig\TwigFilter;
 
 abstract class JS extends Language
 {
+    /** Prettier's default print width, mirrored by the generated .prettierrc. */
+    protected const int PRINT_WIDTH = 80;
+
+    /**
+     * The widest lone argument Prettier will keep beside its callee.
+     *
+     * When an assignment's right-hand side is a call with a single argument,
+     * Prettier breaks after the `=` and leaves the call intact rather than
+     * exploding the argument list — but only while that argument is short
+     * enough to be worth carrying. The cutoff is fitted to Prettier's observed
+     * output rather than derived from its layout algorithm, and holds for every
+     * generated call site across the Web, Node, and React Native SDKs.
+     */
+    protected const int HUGGABLE_ARGUMENT_WIDTH = 20;
+
     protected $params = [
         'npmPackage' => 'packageName',
         'bowerPackage' => 'packageName',
@@ -113,60 +134,32 @@ abstract class JS extends Language
         return [];
     }
 
-    /**
-     * @param array $nestedTypes
-     */
-    public function getTypeName(array $parameter, array $spec = []): string
+    public function getTypeName(Schema|Parameter $parameter, ?Specification $spec = null): string
     {
-        if (
-            ($parameter['type'] ?? null) === self::TYPE_ARRAY
-            && (isset($parameter['enumName']) || !empty($parameter['enumValues']))
-        ) {
-            $enumType = isset($parameter['enumName'])
-                ? \ucfirst($parameter['enumName'])
-                : \ucfirst((string) $parameter['name']);
-
-            return $enumType . '[]';
+        $schema = $this->getSchema($parameter);
+        $model = $this->getSchemaModel($parameter);
+        if ($model !== null) {
+            $type = $this->toPascalCase($model);
+            return $schema instanceof ArraySchema ? $type . '[]' : $type;
         }
-
-        if (isset($parameter['enumName'])) {
-            return \ucfirst($parameter['enumName']);
-        }
-        if (!empty($parameter['enumValues'])) {
-            return \ucfirst((string) $parameter['name']);
-        }
-        if (!empty($parameter['array']['model'])) {
-            return $this->toPascalCase($parameter['array']['model']) . '[]';
-        }
-        if (!empty($parameter['model'])) {
-            $modelType = $this->toPascalCase($parameter['model']);
-            return $parameter['type'] === self::TYPE_ARRAY ? $modelType . '[]' : $modelType;
-        }
-        if (isset($parameter['items'])) {
-            // Map definition nested type to parameter nested type
-            $parameter['array'] = $parameter['items'];
-        }
-        switch ($parameter['type']) {
-            case self::TYPE_INTEGER:
-            case self::TYPE_NUMBER:
-                return 'number';
-            case self::TYPE_ARRAY:
-                if (!empty(($parameter['array'] ?? [])['type']) && !\is_array($parameter['array']['type'])) {
-                    return $this->getTypeName($parameter['array']) . '[]';
-                }
-                return 'any[]';
-            case self::TYPE_FILE:
-                return 'File';
-        }
-
-        return $parameter['type'];
+        return match ($this->getSchemaType($parameter)) {
+            self::TYPE_INTEGER, self::TYPE_NUMBER => 'number',
+            self::TYPE_STRING => 'string',
+            self::TYPE_BOOLEAN => 'boolean',
+            self::TYPE_ARRAY => $this->isUntypedNestedArray($parameter, $schema)
+                ? 'any[][]'
+                : $this->getTypeName($this->getArraySchema($parameter) ?? $schema) . '[]',
+            self::TYPE_FILE => 'File',
+            self::TYPE_OBJECT => 'object',
+            default => 'any',
+        };
     }
 
-    public function getParamDefault(array $param): string
+    public function getParamDefault(Schema|Parameter $param): string
     {
-        $type       = $param['type'] ?? '';
-        $default    = $param['default'] ?? '';
-        $required   = $param['required'] ?? '';
+        $type       = $this->getSchemaType($param);
+        $default    = $this->getSchemaDefault($param);
+        $required   = ($param instanceof Parameter && $param->required);
 
         if ($required) {
             return '';
@@ -212,20 +205,393 @@ abstract class JS extends Language
     }
 
     #[Override]
+    public function keepsOpenEnumType(): bool
+    {
+        return true;
+    }
+
+    protected function getEnumTypeName(Schema|Parameter $parameter, ?Specification $spec = null): ?string
+    {
+        $schema = $this->getSchema($parameter);
+        $enumSchema = $this->getEnumSchema($parameter);
+        if ($enumSchema->enum === []) {
+            return null;
+        }
+
+        $type = $this->toPascalCase($this->getSchemaEnumName($parameter, $spec));
+        if ($this->isOpenStringEnum($parameter)) {
+            $type = '(' . $type . ' | (string & {}))';
+        }
+
+        return $schema instanceof ArraySchema ? $type . '[]' : $type;
+    }
+
+    /**
+     * Render an `if (...)` guard, breaking one operand per line when the
+     * single-line form exceeds the print width.
+     *
+     * @param array<int, string> $operands
+     */
+    protected function formatGuard(array $operands, int $indent, string $operator = '&&'): string
+    {
+        $operands = array_values(array_filter(array_map(trim(...), $operands), fn(string $o): bool => $o !== ''));
+        $pad = str_repeat(' ', $indent);
+        $glue = ' ' . $operator . ' ';
+        $oneLine = $pad . 'if (' . implode($glue, $operands) . ') {';
+
+        if (mb_strlen($oneLine) <= self::PRINT_WIDTH) {
+            return 'if (' . implode($glue, $operands) . ') {';
+        }
+
+        $inner = $pad . str_repeat(' ', 4);
+
+        return "if (\n" . $inner . implode(' ' . $operator . "\n" . $inner, $operands) . "\n" . $pad . ') {';
+    }
+
+    /**
+     * Render the guard that rejects a missing required argument.
+     *
+     * A required path parameter also rejects the empty string: it would
+     * disappear from the interpolated URL and silently turn, say, a fetch of
+     * one deployment into a listing of all of them. Only the empty string is
+     * rejected — `'0'`, `0` and `false` are legitimate identifiers — and only
+     * for plain string parameters, since an enum-typed argument cannot be
+     * compared to `''` without a TypeScript error.
+     */
+    protected function formatRequiredGuard(Parameter $parameter, string $variable, int $indent): string
+    {
+        $operands = ['typeof ' . $variable . " === 'undefined'"];
+
+        if ($this->rejectsEmptyValue($parameter)) {
+            $operands[] = $variable . " === ''";
+        }
+
+        return $this->formatGuard($operands, $indent, '||');
+    }
+
+    private function rejectsEmptyValue(Parameter $parameter): bool
+    {
+        $schema = $this->getSchema($parameter);
+
+        return $parameter->location === ParameterLocation::PATH
+            && $schema instanceof StringSchema
+            && $schema->format !== 'binary'
+            && !$this->isStringEnum($parameter);
+    }
+
+    /**
+     * Render the `new Client()` setup chain for a documentation example.
+     *
+     * Prettier collapses a single-call chain onto one line (breaking the
+     * argument out when it overflows) and keeps a multi-call chain broken.
+     *
+     * @param array<int, array{call: string, argument: string, comment: string}> $calls
+     */
+    protected function formatClientChain(array $calls, string $constructor = 'new Client()'): string
+    {
+        if ($calls === []) {
+            return 'const client = ' . $constructor . ';';
+        }
+
+        if (count($calls) === 1) {
+            $call = $calls[0];
+            $comment = $call['comment'] === '' ? '' : ' // ' . $call['comment'];
+            $oneLine = 'const client = ' . $constructor . '.' . $call['call']
+                . "('" . $call['argument'] . "');";
+
+            if (mb_strlen($oneLine) <= self::PRINT_WIDTH) {
+                return $oneLine . $comment;
+            }
+
+            return 'const client = ' . $constructor . '.' . $call['call'] . "(\n    '"
+                . $call['argument'] . "',\n);" . $comment;
+        }
+
+        $lines = 'const client = ' . $constructor;
+        $last = array_key_last($calls);
+        foreach ($calls as $key => $call) {
+            $comment = $call['comment'] === '' ? '' : ' // ' . $call['comment'];
+            $lines .= "\n    ." . $call['call'] . "('" . $call['argument'] . "')"
+                . ($key === $last ? ';' : '') . $comment;
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Render a call expression, breaking one argument per line when the
+     * single-line form exceeds the print width.
+     *
+     * @param array<int, string> $arguments
+     */
+    protected function formatArgumentList(string $callee, array $arguments, int $indent, string $suffix = ';', int $prefixWidth = 0): string
+    {
+        $arguments = array_values(array_filter(array_map(trim(...), $arguments), fn(string $a): bool => $a !== ''));
+        $oneLine = str_repeat(' ', $indent + $prefixWidth) . $callee . '(' . implode(', ', $arguments) . ')' . $suffix;
+
+        // The caller emits no separator before this expression, so an unbroken
+        // result supplies its own leading space while a broken one starts
+        // cleanly on the next line instead of leaving trailing whitespace.
+        $lead = $prefixWidth > 0 ? ' ' : '';
+
+        if ($arguments === [] || mb_strlen($oneLine) <= self::PRINT_WIDTH) {
+            return $lead . $callee . '(' . implode(', ', $arguments) . ')' . $suffix;
+        }
+
+        // A single short argument does not earn its own line: Prettier breaks
+        // after the assignment instead and leaves the call intact. It only
+        // explodes the list once an argument is long enough to be worth it.
+        if (
+            $prefixWidth > 0
+            && count($arguments) === 1
+            && mb_strlen($arguments[0]) <= self::HUGGABLE_ARGUMENT_WIDTH
+        ) {
+            $hung = str_repeat(' ', $indent + 4) . $callee . '(' . $arguments[0] . ')' . $suffix;
+
+            // Breaking after the assignment only helps if the call then fits.
+            if (mb_strlen($hung) <= self::PRINT_WIDTH) {
+                return "\n" . $hung;
+            }
+
+            // Otherwise Prettier does both: it breaks after the assignment and
+            // still explodes the argument onto its own line.
+            $deep = str_repeat(' ', $indent + 8);
+
+            return "\n" . str_repeat(' ', $indent + 4) . $callee . "(\n"
+                . $deep . $arguments[0] . ",\n"
+                . str_repeat(' ', $indent + 4) . ')' . $suffix;
+        }
+
+        $inner = str_repeat(' ', $indent + 4);
+        $body = '';
+        foreach ($arguments as $argument) {
+            $body .= $inner . $argument . ",\n";
+        }
+
+        return $lead . $callee . "(\n" . $body . str_repeat(' ', $indent) . ')' . $suffix;
+    }
+
+    /**
+     * Render a simple assignment, moving the right-hand side onto its own
+     * indented line when the single-line form exceeds the print width.
+     */
+    protected function formatAssignment(string $lhs, string $rhs, int $indent): string
+    {
+        $oneLine = str_repeat(' ', $indent) . $lhs . ' = ' . $rhs . ';';
+
+        if (mb_strlen($oneLine) <= self::PRINT_WIDTH) {
+            return $lhs . ' = ' . $rhs . ';';
+        }
+
+        return $lhs . " =\n" . str_repeat(' ', $indent + 4) . $rhs . ';';
+    }
+
+    /**
+     * Render one `key: value` entry of a documentation example, wrapping it the
+     * way Prettier would when the single-line form overflows the print width.
+     */
+    protected function formatExampleEntry(string $key, string $value, string $comment, int $indent = 4): string
+    {
+        $pad = str_repeat(' ', $indent);
+        $oneLine = $pad . $key . ': ' . $value . ',';
+        if (mb_strlen($oneLine) <= self::PRINT_WIDTH || str_contains($value, "\n")) {
+            return $key . ': ' . $value . ',' . $comment;
+        }
+
+        // An array literal breaks one element per line; anything else moves the
+        // value onto its own indented line.
+        if (str_starts_with($value, '[') && str_ends_with($value, ']')) {
+            $body = '';
+            foreach ($this->splitTopLevel(mb_substr($value, 1, -1)) as $item) {
+                $body .= '        ' . $item . ",\n";
+            }
+
+            return $key . ": [\n" . $body . '    ],' . $comment;
+        }
+
+        // An object literal expands one member per line, the same way an array
+        // expands its elements.
+        if (str_starts_with($value, '{ ') && str_ends_with($value, ' }')) {
+            $members = $this->splitTopLevel(mb_substr($value, 2, -2));
+            if (count($members) > 1) {
+                $body = '';
+                foreach ($members as $member) {
+                    $body .= $pad . '    ' . $member . ",\n";
+                }
+
+                return $key . ": {\n" . $body . $pad . '},' . $comment;
+            }
+        }
+
+        // Moving the value onto its own line trades the key's width for one
+        // extra indent, so Prettier only does it when the key is wider than
+        // that indent. A shorter key would gain nothing and stays inline.
+        if (mb_strlen($key) <= 6) {
+            return $key . ': ' . $value . ',' . $comment;
+        }
+
+        return $key . ":\n" . $pad . '    ' . $value . ',' . $comment;
+    }
+
+    /**
+     * Split a list on a top-level delimiter, leaving quoted and bracketed
+     * segments — and, when tracking generics, `<...>` segments — intact.
+     *
+     * @return array<int, string>
+     */
+    protected function splitTopLevel(string $body, string $delimiter = ',', bool $trackGenerics = false): array
+    {
+        $parts = [];
+        $current = '';
+        $depth = 0;
+        $quote = null;
+        $escaped = false;
+
+        $chars = str_split($body);
+        foreach ($chars as $index => $char) {
+            if ($quote !== null) {
+                $current .= $char;
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ($char === '\\') {
+                    $escaped = true;
+                } elseif ($char === $quote) {
+                    $quote = null;
+                }
+                continue;
+            }
+
+            if ($char === "'" || $char === '"') {
+                $quote = $char;
+            } elseif (in_array($char, ['{', '[', '('], true)) {
+                $depth++;
+            } elseif (in_array($char, ['}', ']', ')'], true)) {
+                $depth--;
+            } elseif ($trackGenerics && $char === '<') {
+                $depth++;
+            } elseif ($trackGenerics && $char === '>' && ($chars[$index - 1] ?? '') !== '=') {
+                // `=>` is an arrow, not a closing generic bracket.
+                $depth--;
+            }
+
+            if ($char === $delimiter && $depth === 0) {
+                if (trim($current) !== '') {
+                    $parts[] = trim($current);
+                }
+                $current = '';
+                continue;
+            }
+
+            $current .= $char;
+        }
+
+        if (trim($current) !== '') {
+            $parts[] = trim($current);
+        }
+
+        return $parts;
+    }
+
+    /**
+     * Render a named import, expanding it across lines when the single-line
+     * form would exceed Prettier's print width.
+     *
+     * @param array<int, string> $names
+     */
+    protected function formatNamedImport(array $names, string $module): string
+    {
+        $names = array_values(array_filter(array_map(trim(...), $names), fn(string $n): bool => $n !== ''));
+        $oneLine = 'import { ' . implode(', ', $names) . " } from '" . $module . "';";
+
+        if (mb_strlen($oneLine) <= self::PRINT_WIDTH) {
+            return $oneLine;
+        }
+
+        $body = '';
+        foreach ($names as $name) {
+            $body .= '    ' . $name . ",\n";
+        }
+
+        return "import {\n" . $body . "} from '" . $module . "';";
+    }
+
+    /**
+     * Quote a string the way Prettier would: single quotes unless the value
+     * itself contains one and no double quote.
+     *
+     * Control characters must be re-escaped. The example arrives as JSON, so
+     * `json_decode` has already turned sequences like `\n` into real control
+     * characters, and emitting one raw would produce an unterminated string
+     * literal that Prettier cannot even parse.
+     */
+    protected function getStringLiteral(string $value): string
+    {
+        $quote = str_contains($value, "'") && !str_contains($value, '"') ? '"' : "'";
+
+        // NUL deliberately has no `\0` shorthand here: `\0` followed by a digit
+        // forms a legacy octal escape, which is a SyntaxError in strict mode and
+        // silently decodes to the wrong character otherwise. `\x00` is always safe.
+        $escaped = str_replace(
+            ["\\", "\n", "\r", "\t", "\v", "\f", "\x08", "\u{2028}", "\u{2029}"],
+            ['\\\\', '\\n', '\\r', '\\t', '\\v', '\\f', '\\b', '\\u2028', '\\u2029'],
+            $value,
+        );
+
+        // Any remaining C0/C1 control character has no shorthand escape.
+        $escaped = preg_replace_callback(
+            '/[\x00-\x1F\x7F]/u',
+            static fn(array $match): string => sprintf('\\x%02X', ord($match[0])),
+            $escaped,
+        ) ?? $escaped;
+
+        if ($quote === "'") {
+            $escaped = str_replace("'", "\\'", $escaped);
+        }
+
+        return $quote . $escaped . $quote;
+    }
+
+    /**
+     * Render an object literal key, quoting it only when it is not a valid
+     * ECMAScript identifier. Prettier removes redundant quotes, so emitting
+     * them unconditionally would make generated output fail its own check.
+     */
+    protected function getObjectKeyLiteral(string $value): string
+    {
+        if (preg_match('/^[A-Za-z_$][A-Za-z0-9_$]*$/', $value)) {
+            return $value;
+        }
+
+        return $this->getStringLiteral($value);
+    }
+
+    #[Override]
     public function getFilters(): array
     {
         return [
             new TwigFilter('caseEnumKey', fn(string $value): string => $this->toPascalCase($value)),
-            new TwigFilter('enumExample', function (array $param): string {
-                $enumValues = $param['enumValues'] ?? [];
-                if (empty($enumValues)) {
+            new TwigFilter('jsGuard', fn(array $operands, int $indent = 8, string $operator = '&&'): string => $this->formatGuard($operands, $indent, $operator), ['is_safe' => ['html']]),
+            new TwigFilter('jsRequiredGuard', fn(Parameter $parameter, string $variable, int $indent = 8): string => $this->formatRequiredGuard($parameter, $variable, $indent), ['is_safe' => ['html']]),
+            new TwigFilter('jsClientChain', fn(array $calls, string $constructor = 'new Client()'): string => $this->formatClientChain($calls, $constructor), ['is_safe' => ['html']]),
+            new TwigFilter('jsArgs', fn(string $callee, array $arguments, int $indent = 8, string $suffix = ';', int $prefixWidth = 0): string => $this->formatArgumentList($callee, $arguments, $indent, $suffix, $prefixWidth), ['is_safe' => ['html']]),
+            new TwigFilter('jsAssign', fn(string $lhs, string $rhs, int $indent = 8): string => $this->formatAssignment($lhs, $rhs, $indent), ['is_safe' => ['html']]),
+            new TwigFilter('jsExampleEntry', fn(string $key, string $value, string $comment = '', int $indent = 4): string => $this->formatExampleEntry($key, $value, $comment, $indent), ['is_safe' => ['html']]),
+            new TwigFilter('jsImport', fn(array $names, string $module): string => $this->formatNamedImport($names, $module), ['is_safe' => ['html']]),
+            new TwigFilter('trimLines', fn(string $value): string => preg_replace('/[ \t]+$/m', '', $value) ?? $value),
+            new TwigFilter('jsString', fn(?string $value): string => $this->getStringLiteral($value ?? ''), ['is_safe' => ['html']]),
+            new TwigFilter('jsKey', fn(string $value): string => $this->getObjectKeyLiteral($value), ['is_safe' => ['html']]),
+            new TwigFilter('enumExample', function (Schema|Parameter $param): string {
+                $schema = $this->getSchema($param);
+                $enumSchema = $this->getEnumSchema($param);
+                $enumValues = $enumSchema->enum;
+                if ($enumValues === []) {
                     return '';
                 }
 
-                $enumKeys = $param['enumKeys'] ?? [];
-                $enumName = $this->toPascalCase($param['enumName'] ?? $param['name'] ?? '');
-                $example = $param['example'] ?? null;
-                $isArray = ($param['type'] ?? '') === self::TYPE_ARRAY;
+                $enumKeys = $this->resolveEnumKeys($param);
+                $enumName = $this->toPascalCase(($enumSchema instanceof StringSchema ? $enumSchema->enumName : null) ?? ($param instanceof Parameter ? $param->name : $enumSchema->title ?? ''));
+                $example = $this->getSchemaExample($param);
+                $isArray = $schema instanceof ArraySchema;
                 $prefix = $this->getPermissionPrefix();
 
                 $resolveKey = function ($value) use ($enumValues, $enumKeys): string {

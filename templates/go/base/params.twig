@@ -1,11 +1,16 @@
-{% if method.parameters.all|filter(v => not v.required)|length > 0 %}
-	options := {{(method.name ~ "Options") | caseUcfirst}}{}.New()
+{% set requiredQueryParameters = (method | parameters('query')) | filter(v => v.required) %}
+{% set optionalQueryParameters = (method | parameters('query')) | filter(v => not v.required) %}
+{% if (method | methodType) == 'location' %}
+	params := srv.{{ ((method | methodName) ~ 'Params') | caseLcfirst }}({% for parameter in requiredQueryParameters %}{{ parameter.name | caseUcfirst }}{% if not loop.last or optionalQueryParameters | length > 0 %}, {% endif %}{% endfor %}{% if optionalQueryParameters | length > 0 %}optionalSetters...{% endif %})
+{% else %}
+{% if (method | parameters('query')) | merge((method | parameters('body'))) | merge((method | parameters('header'))) | filter(v => not v.required) | length > 0 %}
+	options := {{((method | methodName) ~ "Options") | caseUcfirst}}{}.New()
 	for _, opt := range optionalSetters {
 		opt(options)
 	}
 {% endif %}
 	params := map[string]interface{}{}
-{% for parameter in method.parameters.all %}
+{% for parameter in (method | parameters('query')) | merge((method | parameters('body'))) %}
 {% if parameter.required %}
 	params["{{ parameter.name }}"] = {{ parameter.name | caseUcfirst }}
 {% else %}
@@ -14,11 +19,19 @@
 	}
 {% endif %}
 {% endfor %}
-	headers := map[string]interface{}{
-{%~ for key, security in method.securityHeaders %}
-		"{{ security.name }}": srv.client.Config["{{ key | caseLower }}"],
+{% endif %}
+	headers := map[string]interface{}{}
+{%~ for key, security in (method | securityHeaders) %}
+	headers["{{ security.name }}"] = srv.client.Config["{{ key | caseLower }}"]
 {%~ endfor %}
-{% for key, header in method.headers %}
-		"{{ key }}": "{{ header }}",
+{% for key, header in (method | methodHeaders) %}
+	headers["{{ key }}"] = "{{ header }}"
 {% endfor %}
+{%~ for parameter in (method | parameters('header')) | filter(v => v.required) %}
+	headers["{{ parameter.name }}"] = {{ parameter.name | caseUcfirst }}
+{%~ endfor %}
+{% for parameter in (method | parameters('header')) | filter(v => not v.required) %}
+	if options.enabledSetters["{{ parameter.name | caseUcfirst }}"] {
+		headers["{{ parameter.name }}"] = options.{{ parameter.name | caseUcfirst }}
 	}
+{% endfor %}

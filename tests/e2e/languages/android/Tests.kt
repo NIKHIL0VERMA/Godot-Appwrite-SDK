@@ -13,7 +13,6 @@ import io.appwrite.Operator
 import io.appwrite.Condition
 import io.appwrite.enums.MockType
 import io.appwrite.extensions.fromJson
-import io.appwrite.extensions.toJson
 import io.appwrite.models.Error
 import io.appwrite.models.InputFile
 import io.appwrite.models.Mock
@@ -29,8 +28,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import okhttp3.MultipartBody
 import okhttp3.Response
+import okio.Buffer
 import org.junit.After
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -135,8 +138,21 @@ class ServiceTest {
             }
         }
 
+        var realtimeErrorResponse = "Realtime error:failed"
+        realtime.onError { _, _ ->
+            realtimeErrorResponse = "Realtime error:passed"
+        }
+        realtime.subscribe("error", payloadType = Any::class.java) { }
+
         runBlocking {
             var mock: Mock
+
+            val nullableMockMap = Mock.from(mapOf("result" to "Success")).toMap()
+            check(nullableMockMap.keys.containsAll(setOf("optionalResult", "status", "relatedMock")))
+            check(nullableMockMap["optionalResult"] == null)
+            check(nullableMockMap["status"] == null)
+            check(nullableMockMap["relatedMock"] == null)
+
             // Foo Tests
             mock = foo.get("string", 123, listOf("string in array"))
             writeToFile(mock.result)
@@ -164,6 +180,17 @@ class ServiceTest {
             // General Tests
             val result = general.redirect()
             writeToFile((result as Map<String, Any>)["result"] as String)
+
+            for ((id, plain) in listOf("" to "0", "0" to "")) {
+                try {
+                    general.validatePath(plain, id)
+                    error("Empty path parameter was accepted")
+                } catch (e: AppwriteException) {
+                    writeToFile(e.message ?: "Missing exception message")
+                }
+            }
+            writeToFile(general.validatePath("0", "0").result)
+            writeToFile(general.validatePath("0", null).result)
 
             try {
                 mock = general.upload("string", 123, listOf("string in array"), InputFile.fromPath("../../../../resources/file.png"))
@@ -194,6 +221,8 @@ class ServiceTest {
             } catch (ex: Exception) {
                 writeToFile(ex.toString())
             }
+
+            writeToFile(String(general.download()))
 
             mock = general.enum(MockType.FIRST)
             writeToFile(mock.result)
@@ -240,6 +269,7 @@ class ServiceTest {
             writeToFile(realtimeResponse)
             writeToFile(realtimeResponseWithQueries)
             writeToFile(realtimeResponseWithQueriesFailure)
+            writeToFile(realtimeErrorResponse)
 
             try {
                 rtsubWithQueriesFailure.unsubscribe()
@@ -350,7 +380,10 @@ class ServiceTest {
             writeToFile(Query.distanceGreaterThan("location", listOf(40.7128, -74), 1000, true))
             writeToFile(Query.distanceLessThan("location", listOf(40.7128, -74), 1000))
             writeToFile(Query.distanceLessThan("location", listOf(40.7128, -74), 1000, true))
-            
+            writeToFile(Query.vectorDot("embedding", listOf(0.1, 0.2, 0.3)))
+            writeToFile(Query.vectorCosine("embedding", listOf(0.1, 0.2, 0.3)))
+            writeToFile(Query.vectorEuclidean("embedding", listOf(0.1, 0.2, 0.3)))
+
             // Spatial query tests
             writeToFile(Query.intersects("location", listOf(40.7128, -74)))
             writeToFile(Query.notIntersects("location", listOf(40.7128, -74)))
@@ -471,5 +504,83 @@ class ServiceTest {
         } catch (exception: Exception) {
             null
         }
+    }
+}
+
+@Config(manifest=Config.NONE)
+@RunWith(AndroidJUnit4::class)
+class RequestNullEncodingTest {
+    @Test
+    fun testClientJsonBodyPreservesNestedNullsAndOmitsOptionalParams() = runBlocking {
+        val client = Client(ApplicationProvider.getApplicationContext())
+            .setProject("123456")
+            .setSelfSigned(true)
+        val request = client.prepareRequest(
+            method = "PATCH",
+            path = "/v1/tablesdb/db/tables/tbl/rows/row",
+            headers = mapOf("content-type" to "application/json"),
+            params = mapOf(
+                "data" to mapOf(
+                    "backgroundType" to "SOLID_COLOR",
+                    "solidColorIndex" to null,
+                ),
+                "permissions" to null,
+            )
+        )
+
+        val body = requestBodyUtf8(request.body!!)
+        assertTrue(body.contains("\"solidColorIndex\":null"))
+        assertTrue(body.contains("\"backgroundType\":\"SOLID_COLOR\""))
+        assertFalse(body.contains("permissions"))
+    }
+
+    @Test
+    fun testClientGetOmitsNullQueryParams() = runBlocking {
+        val client = Client(ApplicationProvider.getApplicationContext())
+            .setProject("123456")
+            .setSelfSigned(true)
+        val request = client.prepareRequest(
+            method = "GET",
+            path = "/v1/mock/tests/foo",
+            params = mapOf(
+                "x" to "1",
+                "empty" to null,
+            )
+        )
+
+        val url = request.url.toString()
+        assertTrue(url.contains("x=1"))
+        assertFalse(url.contains("empty"))
+        assertFalse(url.contains("null"))
+    }
+
+    @Test
+    fun testClientMultipartOmitsNullParts() = runBlocking {
+        val client = Client(ApplicationProvider.getApplicationContext())
+            .setProject("123456")
+            .setSelfSigned(true)
+        val request = client.prepareRequest(
+            method = "POST",
+            path = "/v1/storage/files",
+            headers = mapOf("content-type" to MultipartBody.FORM.toString()),
+            params = mapOf(
+                "fileId" to "abc",
+                "permissions" to null,
+            )
+        )
+
+        val body = request.body as MultipartBody
+        val dispositions = body.parts.map { part ->
+            part.headers?.get("Content-Disposition").orEmpty()
+        }
+        assertTrue(dispositions.any { it.contains("fileId") })
+        assertFalse(dispositions.any { it.contains("permissions") })
+        assertFalse(requestBodyUtf8(body).contains("null"))
+    }
+
+    private fun requestBodyUtf8(body: okhttp3.RequestBody): String {
+        val buffer = Buffer()
+        body.writeTo(buffer)
+        return buffer.readUtf8()
     }
 }

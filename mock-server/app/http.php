@@ -12,13 +12,14 @@ use Utopia\MockServer\Utopia\Exception;
 use Utopia\MockServer\Utopia\File;
 use Swoole\Http\Request as SwooleRequest;
 use Swoole\Http\Response as SwooleResponse;
-use Utopia\CLI\Console;
+use Utopia\Console;
 use Utopia\MockServer\Utopia\Response;
 use Utopia\Swoole\Request;
 use Utopia\Swoole\Response as UtopiaSwooleResponse;
 use Utopia\Validator\Text;
 use Utopia\Validator\Integer;
 use Utopia\Validator\ArrayList;
+use Utopia\Validator\Assoc;
 use Utopia\Validator\Host;
 use Utopia\Validator\Nullable;
 use Utopia\Validator\WhiteList;
@@ -311,8 +312,16 @@ App::get('/v1/mock/tests/general/download')
     ->label('sdk.response.type', '*/*')
     ->label('sdk.response.code', Response::STATUS_CODE_OK)
     ->label('sdk.mock', true)
+    ->inject('request')
     ->inject('response')
-    ->action(function (UtopiaSwooleResponse $response) {
+    ->action(function (Request $request, UtopiaSwooleResponse $response) {
+
+        // Location methods render from their own request template, so they are the
+        // easiest place to lose the project header. The real API pairs an API key
+        // against this header and rejects the request without it.
+        if (empty($request->getHeader('x-appwrite-project', ''))) {
+            throw new Exception(Exception::GENERAL_MOCK, 'Missing project ID');
+        }
 
         $response
             ->setContentType('text/plain')
@@ -466,6 +475,21 @@ App::get('/v1/mock/tests/general/path/grant%2Fspecial%26id')
     ->action(function () {
     });
 
+// Shared nullable-path e2e contract. Null is serialized literally by targets
+// that previously could not compile nullable string interpolation.
+foreach (['0', 'null'] as $id) {
+    App::get('/v1/mock/tests/general/path-validation/' . $id . '/0')
+        ->desc('Path validation')
+        ->groups(['mock'])
+        ->label('scope', 'public')
+        ->label('sdk.response.code', Response::STATUS_CODE_OK)
+        ->label('sdk.response.type', Response::CONTENT_TYPE_JSON)
+        ->label('sdk.response.model', Response::MODEL_MOCK)
+        ->label('sdk.mock', true)
+        ->action(function () {
+        });
+}
+
 App::get('/v1/mock/tests/general/set-cookie')
     ->desc('Set Cookie')
     ->groups(['mock'])
@@ -481,7 +505,7 @@ App::get('/v1/mock/tests/general/set-cookie')
     ->inject('response')
     ->inject('request')
     ->action(function (UtopiaSwooleResponse $response, Request $request) {
-        $response->addCookie('cookieName', 'cookieValue', \time() + 31536000, '/', $request->getHostname(), true, true);
+        $response->addCookie('cookieName', 'cookieValue', \time() + 31536000, '/', $request->getHostname(), true, true, '');
     });
 
 App::get('/v1/mock/tests/general/get-cookie')
@@ -535,6 +559,26 @@ App::get('/v1/mock/tests/general/list-rows')
     ->inject('response')
     ->action(function (array $queries, UtopiaSwooleResponse $response) {
         $response->json(['result' => \json_encode($queries)]);
+    });
+
+App::get('/v1/mock/tests/general/optional')
+    ->desc('Get Optional')
+    ->groups(['mock'])
+    ->label('scope', 'public')
+    ->label('sdk.auth', [APP_AUTH_TYPE_SESSION, APP_AUTH_TYPE_KEY, APP_AUTH_TYPE_JWT])
+    ->label('sdk.namespace', 'general')
+    ->label('sdk.method', 'getOptional')
+    ->label('sdk.description', 'Mock a request whose parameters are all optional.')
+    ->label('sdk.response.code', Response::STATUS_CODE_OK)
+    ->label('sdk.response.type', Response::CONTENT_TYPE_JSON)
+    ->label('sdk.response.model', Response::MODEL_MOCK)
+    ->label('sdk.mock', true)
+    ->param('width', -1, new Integer(true), 'Sample optional numeric param', true)
+    ->param('height', -1, new Integer(true), 'Sample optional numeric param', true)
+    ->param('name', '', new Text(100), 'Sample optional string param', true)
+    ->inject('response')
+    ->action(function (int $width, int $height, string $name, UtopiaSwooleResponse $response) {
+        $response->json(['result' => "width={$width},height={$height},name={$name}"]);
     });
 
 App::post('/v1/mock/tests/general/nullable')
@@ -598,6 +642,31 @@ App::post('/v1/mock/tests/general/models/array')
         /** @var Player[] $players */
     });
 
+App::post('/v1/mock/tests/general/documents')
+    ->desc('Create Documents')
+    ->groups(['mock'])
+    ->label('scope', 'public')
+    ->label('sdk.auth', [APP_AUTH_TYPE_SESSION, APP_AUTH_TYPE_KEY, APP_AUTH_TYPE_JWT])
+    ->label('sdk.namespace', 'general')
+    ->label('sdk.method', 'createDocuments')
+    ->label('sdk.description', 'Create documents from an array of plain objects.')
+    ->label('sdk.response.code', Response::STATUS_CODE_OK)
+    ->label('sdk.response.type', Response::CONTENT_TYPE_JSON)
+    ->label('sdk.response.model', Response::MODEL_MOCK)
+    ->label('sdk.mock', true)
+    ->param('documents', [], new ArrayList(new Assoc(), APP_LIMIT_ARRAY_PARAMS_SIZE), 'Array of document objects.')
+    ->action(function (array $documents) {
+        if ($documents === []) {
+            throw new Exception(Exception::GENERAL_MOCK, 'Documents must not be empty');
+        }
+
+        foreach ($documents as $document) {
+            if (!\is_array($document) || !isset($document['$id'])) {
+                throw new Exception(Exception::GENERAL_MOCK, 'Each document must be an object with an $id');
+            }
+        }
+    });
+
 App::get('/v1/mock/tests/union')
     ->desc('Get Union')
     ->groups(['mock'])
@@ -624,6 +693,35 @@ App::get('/v1/mock/tests/union')
                 'result' => 'GET:/v1/mock/tests/union:passed',
             ]);
         }
+    });
+
+App::get('/v1/mock/tests/compound')
+    ->desc('Get compound union')
+    ->groups(['mock'])
+    ->label('scope', 'public')
+    ->param('type', 'mock', new Text(16), 'Mock response scenario', true)
+    ->inject('response')
+    ->action(function (string $type, UtopiaSwooleResponse $response) {
+        $payload = ['type' => 'mock', 'result' => 'compound-mock'];
+        switch ($type) {
+            case 'stub':
+                $payload['format'] = 'stub';
+                $payload['data'] = 'compound-stub';
+                break;
+            case 'unknown':
+                $payload['format'] = 'unknown';
+                break;
+            case 'null':
+                $payload['format'] = null;
+                break;
+            case 'boolean':
+                $payload['type'] = true;
+                break;
+            case 'missing':
+                unset($payload['type']);
+                break;
+        }
+        $response->json($payload);
     });
 
 App::get('/v1/mock/tests/general/400-error')
