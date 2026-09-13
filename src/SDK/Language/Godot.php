@@ -235,9 +235,9 @@ class Godot extends GDScript
                 'template' => 'godot/docs/index.md',
             ],
             [
-                'scope' => 'copy',
+                'scope' => 'default',
                 'destination' => 'docs/getting_started.md',
-                'template' => 'godot/docs/getting_started.md',
+                'template' => 'godot/docs/getting_started.md.twig',
             ],
             [
                 'scope' => 'default',

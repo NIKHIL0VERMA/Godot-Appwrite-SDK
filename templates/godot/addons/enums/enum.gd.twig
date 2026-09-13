@@ -1,7 +1,7 @@
-## Enum: {{ enum.name | caseUpper }}
+## Enum: {{ enum.title | caseUpper }}
 
 {% for value in enum.enum %}
-{% set key = enum.keys is empty ? value : enum.keys[loop.index0] %}
+{% set key = enum.keys is empty ? value : enum.enumKeys[loop.index0] %}
 const {{ key | caseEnumKey }} = "{{ value }}"
 {% endfor %}
 

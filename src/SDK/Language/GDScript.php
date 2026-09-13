@@ -351,9 +351,9 @@ class GDScript extends Language
                 'template' => 'gdscript/docs/index.md',
             ],
             [
-                'scope' => 'copy',
+                'scope' => 'default',
                 'destination' => 'docs/getting_started.md',
-                'template' => 'gdscript/docs/getting_started.md',
+                'template' => 'gdscript/docs/getting_started.md.twig',
             ],
             [
                 'scope' => 'default',
@@ -399,7 +399,7 @@ class GDScript extends Language
             self::TYPE_STRING => 'String',
             self::TYPE_BOOLEAN => 'bool',
             self::TYPE_ARRAY => $this->isUntypedNestedArray($parameter, $schema)
-            ? 'Array' : "Array[" . $this->getTypeName($this->getArraySchema($parameter) ?? $schema) . "]",
+                ? 'Array' : "Array[" . $this->getTypeName($this->getArraySchema($parameter) ?? $schema) . "]",
             self::TYPE_OBJECT => 'Dictionary',
             self::TYPE_FILE => $prefix . 'InputFile',
             default => 'Variant',
