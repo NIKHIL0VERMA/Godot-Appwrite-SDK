@@ -1,4 +1,4 @@
-{% set prefix = spec.title | caseUcfirst %}
+{% set prefix = spec.info.title | caseUcfirst %}
 extends RefCounted
 
 signal on_progress(progress: float, total_size: int, uploaded_size: int)
@@ -55,7 +55,7 @@ func call_web_api(method: String, path: String = "", params: Dictionary = {}) ->
     if not _ensure_configured():
         return {"statusCode": 0, "error": "missing/wrong configuration. please check logs for more info"}
 
-    var oauth_script = load("res://addons/{{ spec.title | caseSnake }}/utils/oauth2.gd")
+    var oauth_script = load("res://addons/{{ spec.info.title | caseSnake }}/utils/oauth2.gd")
     if oauth_script == null:
         return {"statusCode": 0, "error": "Failed loading OAuth2 script"}
     var oauth_client = oauth_script.new()
@@ -243,7 +243,7 @@ func _call_chunked(method: String, path: String, headers: Dictionary, params: Di
         response = await call_api(method, path, headers_copy, params_copy)
         
         if response.has("body") and response["body"] is Dictionary and response["body"].has("$id"):
-            headers_copy["x-{{spec.title | caseLower }}-id"] = response["body"]["$id"]
+            headers_copy["x-{{spec.info.title | caseLower }}-id"] = response["body"]["$id"]
             
         if response.get("statusCode", 0) >= 400:
             return response

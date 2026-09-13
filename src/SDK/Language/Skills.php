@@ -68,7 +68,7 @@ class Skills extends Language
         return $this->getSchemaDefault($param);
     }
 
-    public function getParamExample(Schema|Parameter $param, string $lang = '', array $spec = []): string
+    public function getParamExample(Schema|Parameter $param, string $lang = '', ?Specification $spec = null)pec = null): string
     {
         return $this->getSchemaExample($param);
     }

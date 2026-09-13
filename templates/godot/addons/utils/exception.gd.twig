@@ -1,4 +1,4 @@
-class_name {{spec.title | caseUcfirst}}Exception
+class_name {{spec.info.title | caseUcfirst}}Exception
 
 var message: String ## Error message
 var code: int ## Error code
@@ -13,5 +13,5 @@ func _init(p_message: String = "", p_code: int = 0, p_type: String = "", p_respo
 
 func _to_string() -> String:
     if message == "":
-        return "{{ spec.title | caseUcfirst }}Exception"
-    return "{{ spec.title | caseUcfirst }}Exception: " + type + ", " + message + " (" + str(code) + ")"
+        return "{{ spec.info.title | caseUcfirst }}Exception"
+    return "{{ spec.info.title | caseUcfirst }}Exception: " + type + ", " + message + " (" + str(code) + ")"

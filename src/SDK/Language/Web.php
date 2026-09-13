@@ -299,7 +299,7 @@ class Web extends JS
         return 'document.getElementById(\'uploader\').files[0]';
     }
 
-    public function getParamExample(Schema|Parameter $param, string $lang = '', array $spec = []): string
+    public function getParamExample(Schema|Parameter $param, string $lang = '', ?Specification $spec = null): string
     {
         $type = $this->getSchemaType($param);
         $example = $this->getSchemaExample($param);

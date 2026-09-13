@@ -2,10 +2,16 @@
 
 namespace Appwrite\SDK\Language;
 
-use Override;
-use Appwrite\SDK\Language;
+use Utopia\OpenAPI\Model\ArraySchema;
+use Utopia\OpenAPI\Model\ObjectSchema;
+use Utopia\OpenAPI\Model\Operation;
 use Utopia\OpenAPI\Model\Parameter;
 use Utopia\OpenAPI\Model\Schema;
+use Utopia\OpenAPI\Model\StringSchema;
+use Utopia\OpenAPI\Model\Tag;
+use Utopia\OpenAPI\Specification;
+use Override;
+use Appwrite\SDK\Language;
 use Twig\TwigFilter;
 
 class GDScript extends Language
@@ -171,22 +177,22 @@ class GDScript extends Language
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/plugin.cfg',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/plugin.cfg',
                 'template' => 'gdscript/addons/plugin.cfg.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/plugin.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/plugin.gd',
                 'template' => 'gdscript/addons/plugin.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/{{ spec.title | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/{{ spec.info.title | caseSnake }}.gd',
                 'template' => 'gdscript/addons/appwrite.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/icon.svg',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/icon.svg',
                 'template' => 'gdscript/addons/icon.svg',
             ],
             [
@@ -201,47 +207,47 @@ class GDScript extends Language
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/client.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/client.gd',
                 'template' => 'gdscript/addons/utils/client.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/service.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/service.gd',
                 'template' => 'gdscript/addons/utils/service.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/exception.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/exception.gd',
                 'template' => 'gdscript/addons/utils/exception.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/id.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/id.gd',
                 'template' => 'gdscript/addons/utils/id.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/permission.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/permission.gd',
                 'template' => 'gdscript/addons/utils/permission.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/role.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/role.gd',
                 'template' => 'gdscript/addons/utils/role.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/query.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/query.gd',
                 'template' => 'gdscript/addons/utils/query.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/input_file.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/input_file.gd',
                 'template' => 'gdscript/addons/utils/input_file.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{spec.title | caseSnake}}/utils/operator.gd',
+                'destination' => 'addons/{{spec.info.title | caseSnake}}/utils/operator.gd',
                 'template' => 'gdscript/addons/utils/operator.gd.twig',
             ],
             [
@@ -286,22 +292,22 @@ class GDScript extends Language
             ],
             [
                 'scope' => 'enum',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/enums/{{ enum.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/enums/{{ enum.name | caseSnake }}.gd',
                 'template' => 'gdscript/addons/enums/enum.gd.twig',
             ],
             [
                 'scope' => 'service',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/services/{{ service.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/services/{{ service.name | caseSnake }}.gd',
                 'template' => 'gdscript/addons/services/service.gd.twig',
             ],
             [
                 'scope' => 'definition',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/models/{{ definition.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/models/{{ definition.name | caseSnake }}.gd',
                 'template' => 'gdscript/addons/models/model.gd.twig',
             ],
             [
                 'scope' => 'requestModel',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/models/{{ requestModel.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/models/{{ requestModel.name | caseSnake }}.gd',
                 'template' => 'gdscript/addons/models/model.gd.twig',
             ],
             [
@@ -372,50 +378,28 @@ class GDScript extends Language
         ];
     }
 
-    public function getTypeName(Schema|Parameter $parameter, array $spec = []): string
+    public function getTypeName(Schema|Parameter $parameter, ?Specification $spec = null): string
     {
-        $prefix = $this->toPascalCase($spec['title'] ?? '');
+        $prefix = $this->toPascalCase($spec->info->title ?? '');
+        $schema = $this->getSchema($parameter);
 
-        // ARRAY TYPES
-        if (($parameter['type'] ?? null) === self::TYPE_ARRAY) {
-            // Array of models
-            if (!empty($parameter['array']['model'])) {
-                return 'Array[' . $prefix . $this->toPascalCase($parameter['array']['model']) . ']';
-            }
-
-            // Array of enums
-            if (isset($parameter['enumName'])) {
-                return 'Array[String]';
-            }
-
-            if (!empty($parameter['enumValues'])) {
-                return 'Array[String]';
-            }
-
-            return 'Array';
+        if ($this->usesEnumType($parameter)) {
+            return $schema instanceof ArraySchema ? 'Array[String]' : 'String';
         }
 
-        // MODEL TYPE
-        if (!empty($parameter['model'])) {
-            return $prefix . $this->toPascalCase($parameter['model']);
+        $model = $this->getSchemaModel($parameter);
+        if ($model !== null) {
+            $type = $prefix . $this->toPascalCase($this->getSchemaEnumName($parameter, $spec));
+            return $schema instanceof ArraySchema ? "Array[" . $type . "]" : $type;
         }
 
-        // ENUM TYPE
-        if (isset($parameter['enumName'])) {
-            return 'String';
-        }
-
-        if (!empty($parameter['enumValues'])) {
-            return 'String';
-        }
-
-        // PRIMITIVES
-        return match ($parameter['type'] ?? '') {
+        return match ($this->getSchemaType($parameter)) {
             self::TYPE_INTEGER => 'int',
             self::TYPE_NUMBER => 'float',
             self::TYPE_STRING => 'String',
             self::TYPE_BOOLEAN => 'bool',
-            self::TYPE_ARRAY => 'Array',
+            self::TYPE_ARRAY => $this->isUntypedNestedArray($parameter, $schema)
+            ? 'Array' : "Array[" . $this->getTypeName($this->getArraySchema($parameter) ?? $schema) . "]",
             self::TYPE_OBJECT => 'Dictionary',
             self::TYPE_FILE => $prefix . 'InputFile',
             default => 'Variant',
@@ -424,9 +408,9 @@ class GDScript extends Language
 
     public function getParamDefault(Schema|Parameter $param): string
     {
-        $type = $param['type'] ?? '';
-        $default = $param['default'] ?? '';
-        $required = $param['required'] ?? '';
+        $type = $this->getSchemaType($param);
+        $default = $this->getSchemaDefault($param);
+        $required = ($param instanceof Parameter && $param->required);
 
         if ($required) {
             return '';
@@ -476,59 +460,33 @@ class GDScript extends Language
 
         return $output;
     }
-    public function getParamExample(array $param, string $lang = '', array $spec = []): string
+    public function getParamExample(Schema|Parameter $param, string $lang = '', ?Specification $spec = null): string
     {
-        $type = $param['type'] ?? '';
-        $example = $param['example'] ?? '';
-        $prefix = $this->toPascalCase($spec['title'] ?? '');
+        $type = $this->getSchemaType($param);
+        $example = $this->getSchemaExample($param);
+        $hasExample = !empty($example) || $example === 0 || $example === false;
 
-        $output = '';
+        $prefix = $this->toPascalCase($spec->info->title ?? '');
 
-        if (empty($example) && $example !== 0 && $example !== false) {
-            switch ($type) {
-                case self::TYPE_NUMBER:
-                    $output .= '0.0';
-                    break;
-                case self::TYPE_INTEGER:
-                    $output .= '0';
-                    break;
-                case self::TYPE_BOOLEAN:
-                    $output .= 'false';
-                    break;
-                case self::TYPE_STRING:
-                    $output .= '""';
-                    break;
-                case self::TYPE_ARRAY:
-                    $output .= '[]';
-                    break;
-                case self::TYPE_OBJECT:
-                    $output .= '{}';
-                    break;
-                case self::TYPE_FILE:
-                    $output .= $prefix . 'InputFile.from_path("file.png")';
-                    break;
-            }
-        } else {
-            switch ($type) {
-                case self::TYPE_NUMBER:
-                case self::TYPE_INTEGER:
-                case self::TYPE_ARRAY:
-                case self::TYPE_OBJECT:
-                    $output .= $example;
-                    break;
-                case self::TYPE_BOOLEAN:
-                    $output .= ($example) ? 'true' : 'false';
-                    break;
-                case self::TYPE_STRING:
-                    $output .= "'{$example}'";
-                    break;
-                case self::TYPE_FILE:
-                    $output .= $prefix . 'InputFile.from_path("file.png")';
-                    break;
-            }
+        if (!$hasExample) {
+            return match ($type) {
+                self::TYPE_NUMBER => '0.0',
+                self::TYPE_INTEGER => '0',
+                self::TYPE_BOOLEAN => 'false',
+                self::TYPE_ARRAY => '[]',
+                self::TYPE_OBJECT => '{}',
+                self::TYPE_FILE => $prefix . 'InputFile.from_path("file.png")',
+                self::TYPE_STRING => '""'
+            };
         }
 
-        return $output;
+        return match ($type) {
+            self::TYPE_ARRAY => $this->isPermissionString($example) ? $this->getPermissionExample($example) : $example,
+            self::TYPE_NUMBER, self::TYPE_INTEGER => $example,
+            self::TYPE_BOOLEAN => ($example) ? "true" : "false",
+            self::TYPE_STRING => "'{$example}'",
+            self::TYPE_FILE => $prefix . $example,
+        };
     }
 
     #[Override]

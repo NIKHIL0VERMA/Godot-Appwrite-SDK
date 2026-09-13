@@ -1,4 +1,4 @@
-{% set prefix = spec.title | caseUcfirst %}
+{% set prefix = spec.info.title | caseUcfirst %}
 extends "../utils/service.gd"
 ## {{ service.description | default("Service class.") | replace({"\n": "\n## "}) }}
 
@@ -14,7 +14,7 @@ extends "../utils/service.gd"
 {%~ endif %}
 {%~ if not shouldSkip %}
 {%~ if method.responseModel and method.responseModel != 'any' %}
-{%~ set return_type = (spec.title | caseUcfirst) ~ (method.responseModel | caseUcfirst) %}
+{%~ set return_type = (spec.info.title | caseUcfirst) ~ (method.responseModel | caseUcfirst) %}
 {%~ else %}
 {%~ set return_type = 'Variant' %}
 {%~ endif %}

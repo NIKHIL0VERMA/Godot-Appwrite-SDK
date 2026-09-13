@@ -425,7 +425,7 @@ class PHP extends Language
         return $output;
     }
 
-    public function getParamExample(Schema|Parameter $param, string $lang = '', array $spec = []): string
+    public function getParamExample(Schema|Parameter $param, string $lang = '', ?Specification $spec = null): string
     {
         $type = $this->getSchemaType($param);
         $example = $this->getSchemaExample($param);

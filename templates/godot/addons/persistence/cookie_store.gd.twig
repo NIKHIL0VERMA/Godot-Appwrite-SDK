@@ -3,7 +3,7 @@ extends RefCounted
 const _cookie_class = preload("cookie.gd")
 
 var _cookies: Dictionary = {}
-var _cookie_path: String = "user://{{spec.title|caseLower}}_cookies.json"
+var _cookie_path: String = "user://{{spec.info.title|caseLower}}_cookies.json"
 
 func _init() -> void:
     load_cookies()

@@ -10,14 +10,14 @@ config_version=5
 
 [application]
 
-config/name="{{spec.title | caseUcfirst}} test"
+config/name="{{spec.info.title | caseUcfirst}} test"
 run/main_scene="res://Menu.tscn"
 config/icon="res://icon.svg"
 
 [autoload]
 
-{{spec.title | caseUcfirst}}="*res://addons/{{spec.title | caseSnake }}/{{spec.title | caseSnake}}.gd"
+{{spec.info.title | caseUcfirst}}="*res://addons/{{spec.info.title | caseSnake }}/{{spec.info.title | caseSnake}}.gd"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/{{spec.title | caseSnake }}/plugin.cfg")
+enabled=PackedStringArray("res://addons/{{spec.info.title | caseSnake }}/plugin.cfg")

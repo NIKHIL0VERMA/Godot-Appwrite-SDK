@@ -1,8 +1,8 @@
 @tool
 extends EditorPlugin
 
-const AUTOLOAD_NAME : String = "{{spec.title | caseUcfirst}}"
-const AUTOLOAD_PATH : String = "res://addons/{{spec.title | caseSnake}}/{{spec.title | caseSnake }}.gd"
+const AUTOLOAD_NAME : String = "{{spec.info.title | caseUcfirst}}"
+const AUTOLOAD_PATH : String = "res://addons/{{spec.info.title | caseSnake}}/{{spec.info.title | caseSnake }}.gd"
 
 func _enable_plugin() -> void:
 	add_autoload_singleton(AUTOLOAD_NAME, AUTOLOAD_PATH)

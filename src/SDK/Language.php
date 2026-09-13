@@ -89,7 +89,7 @@ abstract class Language
     /**
      * @param string $lang Optional language variant (for multi-language SDKs)
      */
-    abstract public function getParamExample(Schema|Parameter $param, string $lang = '', array $spec = []): string;
+    abstract public function getParamExample(Schema|Parameter $param, string $lang = '', ?Specification $spec = null): string;
 
     public function setParam(string $key, string $value): Language
     {

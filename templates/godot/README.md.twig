@@ -10,7 +10,7 @@ This sdk provide support for Auth, Databases, Storage, Functions, Teams, and mor
 ## Installation
 
 1. Open the AssetLib tab inside the Godot 4 editor.
-2. Search for {{ spec.title }} SDK.
+2. Search for {{ spec.info.title }} SDK.
 3. Download and install plugin.
 4. Enable the plugin from Project -> Project Settings -> Plugins.
 
@@ -24,7 +24,7 @@ The plugin automatically intializes itself using values from .env. You can also 
 extends Node
 
 func _ready():
-    {{spec.title | caseUcfirst}}.ping()
+    {{spec.info.title | caseUcfirst}}.ping()
 ```
 
 ## Notes

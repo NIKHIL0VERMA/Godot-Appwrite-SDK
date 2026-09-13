@@ -1,4 +1,4 @@
-{% set prefix = spec.title | caseUcfirst %}
+{% set prefix = spec.info.title | caseUcfirst %}
 extends RefCounted
 
 signal on_progress(progress: float, total_size: int, uploaded_size: int)
@@ -251,7 +251,7 @@ func _call_chunked(method: String, path: String, headers: Dictionary, params: Di
         response = await call_api(method, path, headers_copy, params_copy)
         
         if response.has("body") and response["body"] is Dictionary and response["body"].has("$id"):
-            headers_copy["x-{{spec.title | caseLower }}-id"] = response["body"]["$id"]
+            headers_copy["x-{{spec.info.title | caseLower }}-id"] = response["body"]["$id"]
             
         if response.get("statusCode", 0) >= 400:
             return response

@@ -1,5 +1,5 @@
 {% set model = requestModel ?? definition %}
-{% set prefix = spec.title | caseUcfirst %}
+{% set prefix = spec.info.title | caseUcfirst %}
 class_name {{ prefix }}{{ model.name | caseUcfirst }}
 extends RefCounted
 ## {{ model.description | default("Model class.") | replace({"\n": "\n## "}) }}[br]
@@ -9,7 +9,7 @@ extends RefCounted
 {%~ set enumName = property.enumName ?? attribute(property, 'x-enum-name') ?? (model.name ~ (property.name | caseUcfirst)) %}
 {%~ if property.enum or property.items.enum is defined %}
 {%~ if enumName not in imports %}
-const _{{ enumName | caseUcfirst }} := preload("res://addons/{{ spec.title | caseSnake }}/enums/{{ enumName | caseSnake }}.gd")
+const _{{ enumName | caseUcfirst }} := preload("res://addons/{{ spec.info.title | caseSnake }}/enums/{{ enumName | caseSnake }}.gd")
 {% set imports = imports|merge([enumName]) %}
 {%~ endif %}
 {%~ endif %}

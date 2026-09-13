@@ -31,22 +31,22 @@ class Godot extends GDScript
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/plugin.cfg',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/plugin.cfg',
                 'template' => 'godot/addons/plugin.cfg.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/plugin.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/plugin.gd',
                 'template' => 'godot/addons/plugin.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/{{ spec.title | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/{{ spec.info.title | caseSnake }}.gd',
                 'template' => 'godot/addons/appwrite.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/icon.svg',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/icon.svg',
                 'template' => 'godot/addons/icon.svg',
             ],
             [
@@ -61,52 +61,52 @@ class Godot extends GDScript
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/client.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/client.gd',
                 'template' => 'godot/addons/utils/client.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/oauth2.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/oauth2.gd',
                 'template' => 'godot/addons/utils/oauth2.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/service.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/service.gd',
                 'template' => 'godot/addons/utils/service.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/exception.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/exception.gd',
                 'template' => 'godot/addons/utils/exception.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/id.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/id.gd',
                 'template' => 'godot/addons/utils/id.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/permission.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/permission.gd',
                 'template' => 'godot/addons/utils/permission.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/role.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/role.gd',
                 'template' => 'godot/addons/utils/role.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/query.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/query.gd',
                 'template' => 'godot/addons/utils/query.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/input_file.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/input_file.gd',
                 'template' => 'godot/addons/utils/input_file.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/utils/operator.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/utils/operator.gd',
                 'template' => 'godot/addons/utils/operator.gd.twig',
             ],
             [
@@ -146,32 +146,32 @@ class Godot extends GDScript
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/persistence/cookie.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/persistence/cookie.gd',
                 'template' => 'godot/addons/persistence/cookie.gd.twig',
             ],
             [
                 'scope' => 'default',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/persistence/cookie_store.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/persistence/cookie_store.gd',
                 'template' => 'godot/addons/persistence/cookie_store.gd.twig',
             ],
             [
                 'scope' => 'enum',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/enums/{{ enum.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/enums/{{ enum.name | caseSnake }}.gd',
                 'template' => 'godot/addons/enums/enum.gd.twig',
             ],
             [
                 'scope' => 'service',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/services/{{ service.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/services/{{ service.name | caseSnake }}.gd',
                 'template' => 'godot/addons/services/service.gd.twig',
             ],
             [
                 'scope' => 'definition',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/models/{{ definition.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/models/{{ definition.name | caseSnake }}.gd',
                 'template' => 'godot/addons/models/model.gd.twig',
             ],
             [
                 'scope' => 'requestModel',
-                'destination' => 'addons/{{ spec.title | caseSnake }}/models/{{ requestModel.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/models/{{ requestModel.name | caseSnake }}.gd',
                 'template' => 'godot/addons/models/model.gd.twig',
             ],
             [

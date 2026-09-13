@@ -1,6 +1,6 @@
-{% set prefix = spec.title | caseUcfirst %}
+{% set prefix = spec.info.title | caseUcfirst %}
 extends Node
-## [img width=32]res://addons/{{spec.title | caseSnake}}/icon.svg[/img] {{ spec.description | default("Appwrite _client.") | replace({"\n": "[br]\n## "}) }}
+## [img width=32]res://addons/{{spec.info.title | caseSnake}}/icon.svg[/img] {{ spec.description | default("Appwrite _client.") | replace({"\n": "[br]\n## "}) }}
 
 signal on_progress(progress: float, total_size: int, uploaded_size: int)
 

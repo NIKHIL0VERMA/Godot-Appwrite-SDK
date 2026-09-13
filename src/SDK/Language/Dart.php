@@ -245,7 +245,7 @@ class Dart extends Language
         return $output;
     }
 
-    public function getParamExample(Schema|Parameter $param, string $lang = '', array $spec = []): string
+    public function getParamExample(Schema|Parameter $param, string $lang = '', ?Specification $specification = null): string
     {
         $type = $this->getSchemaType($param);
         $example = $this->getSchemaExample($param);
