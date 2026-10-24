@@ -243,32 +243,32 @@ func _ensure_configured() -> bool:
         return false
     return true
 
-## upload chunk function used for chunked uploads
-func _upload_chunk(chunk_start: int, chunk_end: int, chunk_headers: Dictionary) -> Dictionary:
-    var chunk_response: Dictionary
-    for attempt in range(_MAX_CHUNK_RETRIES):
-        var chunk_data = file.get_chunk(chunk_start, chunk_end - chunk_start)
-        var chunk_file = {{prefix}}InputFile.from_bytes(chunk_data, file.filename)
-        chunk_file.content_type = file.content_type
-        var chunk_params = params.duplicate()
-        chunk_params[file_key] = chunk_file
-        chunk_response = await call_api(method, path, chunk_headers, chunk_params)
-        if chunk_response.get("statusCode", 0) < 400:
-            return chunk_response
-        if attempt < _MAX_CHUNK_RETRIES - 1:
-            push_warning("{{prefix}} chunk upload failed (attempt %d/%d), retrying…" % [attempt + 1, _MAX_CHUNK_RETRIES])
-    return chunk_response
-
 func _call_chunked(method: String, path: String, headers: Dictionary, params: Dictionary, file_key: String) -> Dictionary:
     var file: {{prefix}}InputFile = params[file_key]
     var size = file.get_size()
     var total_chunks = int(ceil(float(size) / float(_chunk_size)))
 
+    ## upload chunk function used for chunked uploads
+    var upload_chunk = func(chunk_start: int, chunk_end: int, chunk_headers: Dictionary) -> Dictionary:
+        var chunk_response: Dictionary
+        for attempt in range(_MAX_CHUNK_RETRIES):
+            var chunk_data = file.get_chunk(chunk_start, chunk_end - chunk_start)
+            var chunk_file = {{prefix}}InputFile.from_bytes(chunk_data, file.filename)
+            chunk_file.content_type = file.content_type
+            var chunk_params = params.duplicate()
+            chunk_params[file_key] = chunk_file
+            chunk_response = await call_api(method, path, chunk_headers, chunk_params)
+            if chunk_response.get("statusCode", 0) < 400:
+                return chunk_response
+            if attempt < _MAX_CHUNK_RETRIES - 1:
+                push_warning("{{prefix}} chunk upload failed (attempt %d/%d), retrying…" % [attempt + 1, _MAX_CHUNK_RETRIES])
+        return chunk_response
+
     # upload the first chunk to initiate the upload session
-    var first_end = min(_chunk_size, size)
+    var first_end := min(_chunk_size, size)
     var first_headers = headers.duplicate()
     first_headers["content-range"] = "bytes 0-%d/%d" % [first_end - 1, size]
-    var first_response: Dictionary = await _upload_chunk.call(0, first_end, first_headers)
+    var first_response: Dictionary = await upload_chunk.call(0, first_end, first_headers)
 
     if first_response.get("statusCode", 0) >= 400:
         return first_response
@@ -317,7 +317,7 @@ func _call_chunked(method: String, path: String, headers: Dictionary, params: Di
             if upload_id != "":
                 chunk_hdr["x-{{spec.info.title | caseLower }}-id"] = upload_id
 
-            var chunk_resp: Dictionary = await _upload_chunk.call(chunk_start, chunk_end, chunk_hdr)
+            var chunk_resp: Dictionary = await upload_chunk.call(chunk_start, chunk_end, chunk_hdr)
 
             if chunk_resp.get("statusCode", 0) >= 400:
                 failed[0] = true
