@@ -1,22 +1,22 @@
 {% set prefix = spec.info.title | caseUcfirst %}
 extends Node
-## [img width=32]res://addons/{{spec.info.title | caseSnake}}/icon.svg[/img] {{ spec.description | default("Appwrite _client.") | replace({"\n": "[br]\n## "}) }}
+## [img width=32]res://addons/{{spec.info.title | caseSnake}}/icon.svg[/img] {{ description | default("Appwrite _client.") | replace({"\n": "[br]\n## "}) }}
 
 signal on_progress(progress: float, total_size: int, uploaded_size: int)
 
 # Internal classes for type hinting
-{% for service in spec.services %}
+{% for service in services %}
 const _{{ service.name | caseUpper }} = preload("services/{{ service.name | caseSnake }}.gd")
 {% endfor %}
 
 var _client := preload("utils/client.gd").new()
-{% for service in spec.services %}
+{% for service in services %}
 var {{ service.name | caseCamel }} : _{{ service.name | caseUpper }} = _{{ service.name | caseUpper }}.new(_client) ## {{ service.description | default("No description is provided") }}
 {% endfor %}
 
 # Exposing the Enums
-{% for enum in spec.allEnums %}
-{%~ set enumName = enum.name %}
+{% for enum in allEnums %}
+{%~ set enumName = enum.title %}
 const {{ enumName | caseUpper }} = preload("enums/{{ enumName | caseSnake }}.gd")
 {% endfor %}
 
@@ -51,12 +51,12 @@ func _ready() -> void:
 
     file = null
 
-{% for header in spec.global.headers %}
+{% for key, header in globalHeaders %}
 {% if header.description %}
 ## {{header.description}}
 {% endif %}
-func set_{{header.key | caseSnake}}(value: String) -> {{ prefix }}:
-    _client.set_{{header.key | caseSnake}}(value)
+func set_{{key | caseSnake}}(value: String) -> {{ prefix }}:
+    _client.set_{{key | caseSnake}}(value)
     return self
 
 {% endfor %}
@@ -81,6 +81,10 @@ func add_header(key: String, value: String) -> {{ prefix }}:
 func get_headers() -> Dictionary:
     return _client.get_headers()
 
+## Get config value
+func get_config(key: String) -> Variant:
+    return _client.get_config(key)
+
 func _apply_env(key: String, value: String) -> void:
     match key:
         "{{ prefix | caseUpper }}_ENDPOINT":
@@ -89,9 +93,9 @@ func _apply_env(key: String, value: String) -> void:
                 push_error("{{prefix}} Error (%s): %s" % [err.type, err.message])
         "{{ prefix | caseUpper }}_SELF_SIGNED":
             _client.set_self_signed(value.to_lower() == "true")
-{% for header in spec.global.headers %}
-        "{{ prefix | caseUpper }}_{{ header.key | caseUpper }}":
-            _client.set_{{ header.key | caseSnake }}(value)
+{% for key, header in globalHeaders %}
+        "{{ prefix | caseUpper }}_{{ key | caseUpper }}":
+            _client.set_{{ key | caseSnake }}(value)
 {% endfor %}
 
 ## Ping {{prefix}} Server for testing connection

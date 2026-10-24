@@ -3,9 +3,16 @@ extends RefCounted
 
 signal on_progress(progress: float, total_size: int, uploaded_size: int)
 
+const _MAX_CONCURRENT_UPLOADS = 8
+const _MAX_CHUNK_RETRIES = 3
+
+## Internal class used to await completion of parallel chunk workers.
+class _UploadSync extends RefCounted:
+    signal workers_done
+
 var _chunk_size = 5 * 1024 * 1024
 var _self_signed = false
-var _endpoint = '{{spec.endpoint}}'
+var _endpoint = '{{(spec | endpoint)}}'
 var _global_headers = {
     'content-type': '',
     'user-agent': '{{prefix}}{{ language.name | caseUcfirst }}SDK/{{ sdk.version }} (Client:' + Engine.get_version_info().string + '; ' + OS.get_name() + ' ' + OS.get_model_name() + ')',
@@ -13,10 +20,11 @@ var _global_headers = {
     'x-sdk-platform': '{{ sdk.platform }}',
     'x-sdk-language': '{{ language.name | caseLower }}',
     'x-sdk-version': '{{ sdk.version }}',
-{% for key,header in spec.global.defaultHeaders %}
+{% for key,header in defaultHeaders %}
     '{{key}}': '{{header}}',
 {% endfor %}
 }
+var _config = {}
 
 const _cookie_store_class = preload("../persistence/cookie_store.gd")
 var _cookie_store = _cookie_store_class.new()
@@ -45,9 +53,15 @@ func add_header(key: String, value: String) -> RefCounted:
 func get_headers() -> Dictionary:
     return _global_headers.duplicate()
 
-{% for header in spec.global.headers %}
-func set_{{header.key | caseSnake}}(value: String) -> RefCounted:
-    _global_headers['{{header.name|lower}}'] = value
+func get_config(key: String) -> Variant:
+    return _config.get(key, null)
+
+{% for key, header in globalHeaders %}
+func set_{{key | caseSnake}}(value: String) -> RefCounted:
+    {%~ if (key != 'Project') %}
+    _global_headers['{{header.name|lower}}'] = {{ header.scheme == 'bearer' ? "'Bearer ' + value" : 'value' }}
+    {%~ endif %}
+    _config['{{key|lower}}'] = value
     return self
 
 {% endfor %}
@@ -221,37 +235,114 @@ func _ensure_configured() -> bool:
         return false
     return true
 
+## upload chunk function used for chunked uploads
+func _upload_chunk(chunk_start: int, chunk_end: int, chunk_headers: Dictionary) -> Dictionary:
+    var chunk_response: Dictionary
+    for attempt in range(_MAX_CHUNK_RETRIES):
+        var chunk_data = file.get_chunk(chunk_start, chunk_end - chunk_start)
+        var chunk_file = {{prefix}}InputFile.from_bytes(chunk_data, file.filename)
+        chunk_file.content_type = file.content_type
+        var chunk_params = params.duplicate()
+        chunk_params[file_key] = chunk_file
+        chunk_response = await call_api(method, path, chunk_headers, chunk_params)
+        if chunk_response.get("statusCode", 0) < 400:
+            return chunk_response
+        if attempt < _MAX_CHUNK_RETRIES - 1:
+            push_warning("{{prefix}} chunk upload failed (attempt %d/%d), retrying…" % [attempt + 1, _MAX_CHUNK_RETRIES])
+    return chunk_response
+
 func _call_chunked(method: String, path: String, headers: Dictionary, params: Dictionary, file_key: String) -> Dictionary:
     var file: {{prefix}}InputFile = params[file_key]
     var size = file.get_size()
-    var start = 0
-    var response := {}
-    
-    var headers_copy = headers.duplicate()
-    var params_copy = params.duplicate()
+    var total_chunks = int(ceil(float(size) / float(_chunk_size)))
 
-    while start < size:
-        var end = min(start + _chunk_size, size)
-        headers_copy["content-range"] = "bytes %d-%d/%d" % [start, end - 1, size]
-        
-        var chunk_data = file.get_chunk(start, end - start)
-        var chunk_file = {{prefix}}InputFile.from_bytes(chunk_data, file.filename)
-        chunk_file.content_type = file.content_type
-        
-        params_copy[file_key] = chunk_file
-        
-        response = await call_api(method, path, headers_copy, params_copy)
-        
-        if response.has("body") and response["body"] is Dictionary and response["body"].has("$id"):
-            headers_copy["x-{{spec.info.title | caseLower }}-id"] = response["body"]["$id"]
-            
-        if response.get("statusCode", 0) >= 400:
-            return response
-        
-        start = end
-        on_progress.emit((float(start) / size) * 100.0, size, start)
-        
-    return response
+    # upload the first chunk to initiate the upload session
+    var first_end = min(_chunk_size, size)
+    var first_headers = headers.duplicate()
+    first_headers["content-range"] = "bytes 0-%d/%d" % [first_end - 1, size]
+    var first_response: Dictionary = await _upload_chunk.call(0, first_end, first_headers)
+
+    if first_response.get("statusCode", 0) >= 400:
+        return first_response
+
+    var upload_id := ""
+    if first_response.get("body") is Dictionary:
+        upload_id = first_response["body"].get("$id", "")
+
+    var completed_count := 1
+    var uploaded_bytes := first_end
+    on_progress.emit((float(uploaded_bytes) / size) * 100.0, size, uploaded_bytes)
+
+    ## If the file fits in a single chunk, return the first response
+    if total_chunks == 1:
+        return first_response
+
+    ## Prepare the remaining chunks for upload
+    var chunks: Array = []
+    var pos = first_end
+    while pos < size:
+        chunks.append([pos, min(pos + _chunk_size, size)])
+        pos += _chunk_size
+
+    ## Shared mutable state for workers
+    var next_idx := [0]           # shared mutable index
+    var active_workers := [0]     # reference counter
+    var failed := [false]         # shared failure flag
+    var last_response := [first_response]
+    var final_response: Array = []  # set to the completing-chunk response
+    var sync := _UploadSync.new()
+
+    ## worker function to upload chunks in parallel
+    var worker_fn := func() -> void:
+        active_workers[0] += 1
+        while not failed[0]:
+            var idx: int = next_idx[0]
+            if idx >= chunks.size():
+                break
+            next_idx[0] += 1
+
+            var chunk_start: int = chunks[idx][0]
+            var chunk_end: int   = chunks[idx][1]
+
+            var chunk_hdr = headers.duplicate()
+            chunk_hdr["content-range"] = "bytes %d-%d/%d" % [chunk_start, chunk_end - 1, size]
+            if upload_id != "":
+                chunk_hdr["x-{{spec.info.title | caseLower }}-id"] = upload_id
+
+            var chunk_resp: Dictionary = await _upload_chunk.call(chunk_start, chunk_end, chunk_hdr)
+
+            if chunk_resp.get("statusCode", 0) >= 400:
+                failed[0] = true
+                last_response[0] = chunk_resp
+                break
+
+            last_response[0] = chunk_resp
+            completed_count += 1
+            uploaded_bytes += chunk_end - chunk_start
+            on_progress.emit((float(uploaded_bytes) / size) * 100.0, size, uploaded_bytes)
+
+            ## Detect the completing chunk (chunksUploaded >= chunksTotal)
+            if chunk_resp.get("body") is Dictionary:
+                var body: Dictionary = chunk_resp["body"]
+                var cu = body.get("chunksUploaded", 0)
+                var ct = body.get("chunksTotal", total_chunks)
+                if typeof(cu) in [TYPE_INT, TYPE_FLOAT] and typeof(ct) in [TYPE_INT, TYPE_FLOAT] and int(cu) >= int(ct):
+                    final_response = [chunk_resp]
+
+        active_workers[0] -= 1
+        if active_workers[0] == 0:
+            sync.workers_done.emit()
+
+    var worker_count = min(_MAX_CONCURRENT_UPLOADS, chunks.size())
+    for _w in range(worker_count):
+        worker_fn.call()
+
+    await sync.workers_done
+
+    if failed[0]:
+        return last_response[0]
+
+    return final_response[0] if final_response.size() > 0 else last_response[0]
 
 func _query_string_from_dict(p_dict: Dictionary) -> String:
     var query := ""

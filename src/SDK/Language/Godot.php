@@ -156,7 +156,7 @@ class Godot extends GDScript
             ],
             [
                 'scope' => 'enum',
-                'destination' => 'addons/{{ spec.info.title | caseSnake }}/enums/{{ enum.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/enums/{{ enum.title | caseSnake }}.gd',
                 'template' => 'godot/addons/enums/enum.gd.twig',
             ],
             [
@@ -166,17 +166,17 @@ class Godot extends GDScript
             ],
             [
                 'scope' => 'definition',
-                'destination' => 'addons/{{ spec.info.title | caseSnake }}/models/{{ definition.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/models/{{ definitionName | caseSnake }}.gd',
                 'template' => 'godot/addons/models/model.gd.twig',
             ],
             [
                 'scope' => 'requestModel',
-                'destination' => 'addons/{{ spec.info.title | caseSnake }}/models/{{ requestModel.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/models/{{ requestModelName | caseSnake }}.gd',
                 'template' => 'godot/addons/models/model.gd.twig',
             ],
             [
                 'scope' => 'method',
-                'destination' => 'docs/{{service.name | caseSnake}}/{{method.name | caseSnake}}.md',
+                'destination' => 'docs/{{service.name | caseSnake}}/{{(method | methodName) | caseSnake}}.md',
                 'template' => 'godot/docs/example.md.twig',
             ],
             [

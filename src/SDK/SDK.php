@@ -156,9 +156,9 @@ class SDK
         $this->twig->addFilter(new TwigFilter('typeName', fn(Schema|Parameter $value, ?Specification $spec = null): string => $this->language->getTypeName($value, $spec ?? $this->spec), ['is_safe' => ['html']]));
         $this->twig->addFilter(new TwigFilter('getValidResponseModels', fn(Operation $value): array => $this->getValidResponseModels($value)));
         $this->twig->addFilter(new TwigFilter('paramDefault', fn(Schema|Parameter $value): string => $this->language->getParamDefault($value), ['is_safe' => ['html']]));
-        $this->twig->addFilter(new TwigFilter('paramExample', fn(Schema|Parameter $value): string => $this->language->isOpenStringEnum($value)
+        $this->twig->addFilter(new TwigFilter('paramExample', fn(Schema|Parameter $value, ?Specification $spec = null): string => $this->language->isOpenStringEnum($value)
             ? $this->language->getSuggestedEnumExample($value)
-            : $this->language->getParamExample($value), ['is_safe' => ['html']]));
+            : $this->language->getParamExample($value, '', $spec), ['is_safe' => ['html']]));
         $this->twig->addFilter(new TwigFilter('methodName', fn(Operation $operation): string => $this->methodName($operation)));
         $this->twig->addFilter(new TwigFilter('methodType', fn(Operation $operation): string|false => $this->language->getMethodType($operation, $this->spec)));
         $this->twig->addFilter(new TwigFilter('parameters', fn(Operation $operation, string $location = 'all'): array => $this->getOperationParameters($operation, $location)));

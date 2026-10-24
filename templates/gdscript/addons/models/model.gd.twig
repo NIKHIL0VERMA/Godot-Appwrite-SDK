@@ -1,13 +1,13 @@
 {% set model = requestModel ?? definition %}
 {% set prefix = spec.info.title | caseUcfirst %}
-class_name {{ prefix }}{{ model.name | caseUcfirst }}
+class_name {{ prefix }}{{ (requestModelName ?? definitionName) | caseUcfirst }}
 extends RefCounted
 ## {{ model.description | default("Model class.") | replace({"\n": "\n## "}) }}[br]
 
 {% set imports = [] %}
 {%~ for property in model.properties %}
-{%~ set enumName = property.enumName ?? attribute(property, 'x-enum-name') ?? (model.name ~ (property.name | caseUcfirst)) %}
-{%~ if property.enum or property.items.enum is defined %}
+{%~ set enumName = property | enumName %}
+{%~ if (property | enumValues) is not empty %}
 {%~ if enumName not in imports %}
 const _{{ enumName | caseUcfirst }} := preload("res://addons/{{ spec.info.title | caseSnake }}/enums/{{ enumName | caseSnake }}.gd")
 {% set imports = imports|merge([enumName]) %}
@@ -17,46 +17,49 @@ const _{{ enumName | caseUcfirst }} := preload("res://addons/{{ spec.info.title 
 
 const _FIELD_MAP := {
 {% for property in model.properties %}
-    "{{ property.name | uniqueSnake }}": "{{ property.name }}",
+    "{{ (property | schemaName) | uniqueSnake }}": "{{ property | schemaName }}",
 {% endfor %}
 }
 
 {% for property in model.properties %}
 {% set baseType = property | typeName(spec) %}
-var {{ property.name | uniqueSnake }}: {{ baseType }} ## {{ property.description | default("No description provided.") }}
+var {{ (property | schemaName) | uniqueSnake }}: {{ baseType }} ## {{ property.description | default("No description provided.") }}
 {% endfor %}
 
 ## Convert dictionary to model
 static func from_dict(dict: Dictionary):
-    var m := {{ prefix }}{{ model.name | caseUcfirst }}.new()
+    var m := {{ prefix }}{{ (requestModelName ?? definitionName) | caseUcfirst }}.new()
 
     for key in _FIELD_MAP:
         var raw_key = _FIELD_MAP[key]
-        
+
         # Skip if key doesn't exist in dict
         if not dict.has(raw_key):
             continue
-        
+
         var value = dict.get(raw_key)
 
 {% for property in model.properties %}
-{% set field = property.name | uniqueSnake %}
-{% set enumName = property.enumName ?? attribute(property, 'x-enum-name') ?? (model.name ~ (property.name | caseUcfirst)) %}
-{% if property.model %}
+{% set field = (property | schemaName) | uniqueSnake %}
+{% set enumName = property | enumName %}
+{% set isEnum = (property | enumValues) is not empty %}
+{% set isArray = (property | schemaType) == 'array' %}
+{% set modelName = property | schemaModel %}
+{% if modelName and not isArray %}
         if key == "{{ field }}" and value is Dictionary:
-            var nested = {{ prefix }}{{ property.model | caseUcfirst }}.from_dict(value)
-            if nested is {{prefix}}Exception:
+            var nested = {{ prefix }}{{ modelName | caseUcfirst }}.from_dict(value)
+            if nested is {{ prefix }}Exception:
                 return nested
             m.set(key, nested)
             continue
 {% endif %}
-{% if property.array.model %}
+{% if modelName and isArray %}
         if key == "{{ field }}" and value is Array:
             var list := []
             for item in value:
                 if item is Dictionary:
-                    var nested = {{ prefix }}{{ property.array.model | caseUcfirst }}.from_dict(item)
-                    if nested is {{prefix}}Exception:
+                    var nested = {{ prefix }}{{ modelName | caseUcfirst }}.from_dict(item)
+                    if nested is {{ prefix }}Exception:
                         return nested
                     list.append(nested)
                 else:
@@ -64,26 +67,26 @@ static func from_dict(dict: Dictionary):
             m.set(key, list)
             continue
 {% endif %}
-{% if property.enum %}
+{% if isEnum and not isArray %}
         if key == "{{ field }}" and value != null:
             if not _{{ enumName | caseUcfirst }}.is_valid(value):
                 push_error("Invalid enum value for {{ field }}: %s" % value)
-                return {{prefix}}Exception.new("Invalid enum value for {{ field }}: %s" % value, 0, "invalid_enum_value", str(dict))
+                return {{ prefix }}Exception.new("Invalid enum value for {{ field }}: %s" % value, 0, "invalid_enum_value", str(dict))
             m.set(key, value)
             continue
 {% endif %}
-{% if property.type == 'array' and property.items.enum is defined %}
+{% if isEnum and isArray %}
         if key == "{{ field }}" and value is Array:
             var list := []
             for item in value:
                 if not _{{ enumName | caseUcfirst }}.is_valid(item):
                     push_error("Invalid enum value: %s" % item)
-                    return {{prefix}}Exception.new("Invalid enum value for {{ field }}: %s" % value, 0, "invalid_enum_value", str(dict))
+                    return {{ prefix }}Exception.new("Invalid enum value for {{ field }}: %s" % value, 0, "invalid_enum_value", str(dict))
                 list.append(item)
             m.set(key, list)
             continue
 {% endif %}
-{% if property.type == 'array' and not property.array.model %}
+{% if isArray and not modelName and not isEnum %}
         if key == "{{ field }}" and value is Array:
             m.set(key, value)
             continue
@@ -101,13 +104,15 @@ func to_dict() -> Dictionary:
         var value = get(key)
 
 {% for property in model.properties %}
-{% set field = property.name | uniqueSnake %}
-{% if property.model %}
+{% set field = (property | schemaName) | uniqueSnake %}
+{% set isArray = (property | schemaType) == 'array' %}
+{% set modelName = property | schemaModel %}
+{% if modelName and not isArray %}
         if key == "{{ field }}" and value != null:
             dict[_FIELD_MAP[key]] = value.to_dict()
             continue
 {% endif %}
-{% if property.array.model %}
+{% if modelName and isArray %}
         if key == "{{ field }}" and value is Array:
             var list := []
             for item in value:

@@ -10,8 +10,8 @@
 ```gdscript
 extends Node
 
-{% if method.responseModel and method.responseModel != 'any' %}
-{% set return_type = prefix ~ (method.responseModel | caseUcfirst) %}
+{% if (method | responseModel) and (method | responseModel) != 'any' %}
+{% set return_type = prefix ~ ((method | responseModel) | caseUcfirst) %}
 {% else %}
 {% set return_type = 'Variant' %}
 {% endif -%}
@@ -20,7 +20,7 @@ func _ready():
     # You can skip setup if you have .env
     {%~ if [(method | securitySchemes)]|length > 0 %}
     {{prefix}}.set_endpoint('{{ endpointDocs | raw }}') # Your API Endpoint
-    {%~ for node in [(metho | securitySchemes)] %}
+    {%~ for node in [(method | securitySchemes)] %}
     {%~ for key,header in node|keys %}
     {{prefix}}.set_{{header | caseSnake}}('{{node[header].extensions['x-appwrite']['demo'] | raw }}') # {{node[header].description}}
     {%~ endfor -%}
@@ -29,7 +29,7 @@ func _ready():
 
     var result = await {{prefix}}.{{ service.name | caseCamel }}.{{ (method | methodName) | caseSnake | escapeKeyword }}(
 {% for parameter in (method | parameters('all')) %}
-        {% if (parameter | enumSuggestions) | length > 0 %}{{prefix}}.{{ parameter | enumExample }}{% else %}{{ parameter | paramExample('', spec) }}{% endif %}{% if not loop.last %},{% endif %}{% if not parameter.required %} # optional{% endif %}
+        {% if (parameter | enumSuggestions) | length > 0 %}{{prefix}}.{{ parameter | enumExample }}{% else %}{{ parameter | paramExample(spec) }}{% endif %}{% if not loop.last %},{% endif %}{% if not parameter.required %} # optional{% endif %}
 
 {% endfor %}
     )

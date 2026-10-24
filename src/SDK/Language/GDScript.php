@@ -292,7 +292,7 @@ class GDScript extends Language
             ],
             [
                 'scope' => 'enum',
-                'destination' => 'addons/{{ spec.info.title | caseSnake }}/enums/{{ enum.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/enums/{{ enum.title | caseSnake }}.gd',
                 'template' => 'gdscript/addons/enums/enum.gd.twig',
             ],
             [
@@ -302,17 +302,17 @@ class GDScript extends Language
             ],
             [
                 'scope' => 'definition',
-                'destination' => 'addons/{{ spec.info.title | caseSnake }}/models/{{ definition.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/models/{{ definitionName | caseSnake }}.gd',
                 'template' => 'gdscript/addons/models/model.gd.twig',
             ],
             [
                 'scope' => 'requestModel',
-                'destination' => 'addons/{{ spec.info.title | caseSnake }}/models/{{ requestModel.name | caseSnake }}.gd',
+                'destination' => 'addons/{{ spec.info.title | caseSnake }}/models/{{ requestModelName | caseSnake }}.gd',
                 'template' => 'gdscript/addons/models/model.gd.twig',
             ],
             [
                 'scope' => 'method',
-                'destination' => 'docs/{{service.name | caseSnake}}/{{method.name | caseSnake}}.md',
+                'destination' => 'docs/{{service.name | caseSnake}}/{{(method | methodName) | caseSnake}}.md',
                 'template' => 'gdscript/docs/example.md.twig',
             ],
             [
@@ -389,7 +389,7 @@ class GDScript extends Language
 
         $model = $this->getSchemaModel($parameter);
         if ($model !== null) {
-            $type = $prefix . $this->toPascalCase($this->getSchemaEnumName($parameter, $spec));
+            $type = $prefix . $this->toPascalCase($model);
             return $schema instanceof ArraySchema ? "Array[" . $type . "]" : $type;
         }
 
@@ -466,7 +466,7 @@ class GDScript extends Language
         $example = $this->getSchemaExample($param);
         $hasExample = !empty($example) || $example === 0 || $example === false;
 
-        $prefix = $this->toPascalCase($spec->info->title ?? '');
+        $prefix = $this->toPascalCase($spec?->info->title ?? '');
 
         if (!$hasExample) {
             return match ($type) {
@@ -476,16 +476,21 @@ class GDScript extends Language
                 self::TYPE_ARRAY => '[]',
                 self::TYPE_OBJECT => '{}',
                 self::TYPE_FILE => $prefix . 'InputFile.from_path("file.png")',
-                self::TYPE_STRING => '""'
+                self::TYPE_STRING => '""',
             };
         }
 
         return match ($type) {
             self::TYPE_ARRAY => $this->isPermissionString($example) ? $this->getPermissionExample($example) : $example,
+            self::TYPE_STRING => "'" . $example . "'",
             self::TYPE_NUMBER, self::TYPE_INTEGER => $example,
-            self::TYPE_BOOLEAN => ($example) ? "true" : "false",
-            self::TYPE_STRING => "'{$example}'",
+            self::TYPE_BOOLEAN => ($example) ? 'true' : 'false',
             self::TYPE_FILE => $prefix . $example,
+            self::TYPE_OBJECT => ($example === '{}')
+                ? '{}'
+                : (($formatted = json_encode(json_decode((string) $example, true), JSON_PRETTY_PRINT))
+                    ? preg_replace('/\n/', "\n    ", $formatted)
+                    : $example),
         };
     }
 
@@ -495,16 +500,18 @@ class GDScript extends Language
         return array_merge([
             new TwigFilter('caseEnumKey', fn(string $value): string => $this->toUpperSnakeCase($value)),
             new TwigFilter('uniqueSnake', fn(string $value): string => $this->toUniqueSnake($value)),
-            new TwigFilter('enumExample', function (array $param): string {
-                $enumValues = $param['enumValues'] ?? [];
-                if (empty($enumValues)) {
+            new TwigFilter('enumExample', function (Schema|Parameter $param): string {
+                $schema = $this->getSchema($param);
+                $enumSchema = $this->getEnumSchema($param);
+                $enumValues = $enumSchema->enum;
+                if ($enumValues === []) {
                     return '';
                 }
 
-                $enumKeys = $param['enumKeys'] ?? [];
-                $enumName = $this->toPascalCase($param['enumName'] ?? $param['name'] ?? '');
-                $example = $param['example'] ?? null;
-                $isArray = ($param['type'] ?? '') === self::TYPE_ARRAY;
+                $enumKeys = $this->resolveEnumKeys($param);
+                $enumName = $this->toPascalCase(($enumSchema instanceof StringSchema ? $enumSchema->enumName : null) ?? ($param instanceof Parameter ? $param->name : $enumSchema->title ?? ''));
+                $example = $this->getSchemaExample($param);
+                $isArray = $schema instanceof ArraySchema;
 
                 $resolveKey = function ($value) use ($enumValues, $enumKeys): string {
                     $index = array_search($value, $enumValues, true);
